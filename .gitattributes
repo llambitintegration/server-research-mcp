@@ -1,2 +1,25 @@
-# Auto detect text files and perform LF normalization
+# Handle line endings automatically
 * text=auto
+
+# Explicitly declare text files
+*.py text
+*.md text
+*.yaml text
+*.yml text
+*.json text
+*.toml text
+*.ini text
+*.txt text
+*.sh text
+*.bat text
+*.js text
+*.ts text
+*.html text
+*.css text
+*.env text
+
+# Treat lock files as binary
+*.lock binary
+
+# Ensure notebooks are treated as text
+*.ipynb text

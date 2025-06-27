@@ -1,0 +1,132 @@
+context_gathering_task:
+  description: >
+    Initialize memory and gather context for: {paper_query}
+    
+    Quick workflow:
+    1. Search existing memory for {paper_query} and related research
+    2. Create essential memory entities for key concepts
+    3. Build enriched context for the researcher agent
+    
+    Keep it brief but comprehensive. Current year: {current_year}
+  expected_output: >
+    An enriched query object containing:
+    - Original paper query with expanded search terms
+    - Historical context from previous papers
+    - Related authors and research areas identified
+    - Relevant memory entities created or updated
+    - Recommendations for search strategies
+    Your response will be provided to another LLM; you MUST follow schema.
+    The output  MUST include (but is not limited to) the following fields:
+    - Thought:
+    - Action:
+    - Action Input:
+  agent: historian
+  human_input: true
+
+paper_extraction_task:
+  description: >
+    Locate and extract comprehensive content from the target paper based on enriched query: {enriched_query}
+    Automatically prioritize journals commonly used in formal verification research.
+    
+    Your workflow should be:
+    1. Use zotero-mcp to search for the paper using provided identifiers or search terms
+    2. Download and parse the full paper content (PDF, HTML, or other formats)
+    3. Extract all metadata including title, authors, year, DOI, journal, etc.
+    4. Extract main content sections:
+       - Abstract
+       - Introduction
+       - Methodology
+       - Results
+       - Discussion
+       - Conclusion
+       - References
+    5. Identify figures, tables, and equations with their captions
+    6. Extract highlights, annotations, and notes if available
+    
+    Ensure comprehensive extraction while maintaining structure integrity.
+  expected_output: >
+    A raw paper object containing:
+    - Complete metadata (title, authors, year, journal, DOI, etc.)
+    - Full text content organized by sections
+    - References list with parsed citations
+    - Figures and tables information
+    - Any annotations or highlights
+    - Extraction quality metrics
+    Your response will be provided to another LLM; you MUST follow schema.
+    The output  MUST include (but is not limited to) the following fields:
+    - Thought:
+    - Action:
+    - Action Input:
+  agent: researcher
+
+data_structuring_task:
+  description: >
+    Transform raw paper data into validated JSON schema format: {raw_paper_data}
+    
+    Your workflow should be:
+    1. Apply the research paper JSON schema to structure the raw data
+    2. Use sequential-thinking for intelligent summarization of each section
+    3. Validate all required fields are present and properly formatted
+    4. Generate intelligent summaries that preserve key insights
+    5. Create structured data for:
+       - Paper metadata with proper typing
+       - Section summaries with key points
+       - Author information with affiliations
+       - Citation network data
+       - Keywords and topics extraction
+       - Key findings and contributions
+    6. Ensure Obsidian compatibility for all text fields
+    7. Add quality scores and validation status
+    
+    Maintain high fidelity while ensuring schema compliance.
+  expected_output: >
+    A validated JSON object conforming to research paper schema containing:
+    - Fully validated metadata section
+    - Structured content with intelligent summaries
+    - Author and affiliation data
+    - Citation and reference data
+    - Keywords and topic classifications
+    - Key findings and contributions
+    - Validation status and quality metrics
+    Formatted as valid JSON matching the schema
+  agent: archivist
+
+markdown_generation_task:
+  description: >
+    Convert structured JSON to Obsidian markdown and integrate into vault: {structured_json}
+    
+    Your workflow should be:
+    1. Transform JSON structure to markdown using Obsidian conventions
+    2. Generate comprehensive YAML frontmatter including:
+       - Title, authors, year, journal
+       - Tags based on keywords and topics
+       - Aliases for alternative references
+       - Custom metadata fields
+    3. Create markdown sections with proper hierarchy:
+       - Summary section with key insights
+       - Detailed sections for each paper component
+       - Properly formatted citations and references
+       - Tables and figure references
+    4. Generate knowledge graph connections:
+       - Wiki-links to related papers
+       - Author pages connections
+       - Topic and concept links
+       - Citation network visualization
+    5. Use obsidian-mcp-tools to:
+       - Save to appropriate vault location
+       - Update index files
+       - Create necessary folders
+    6. Ensure beautiful formatting with modern Obsidian features
+    
+    Create a document that enhances the knowledge graph.
+  expected_output: >
+    A completed Obsidian markdown document containing:
+    - Rich YAML frontmatter with all metadata
+    - Well-structured markdown content
+    - Extensive wiki-links and connections
+    - Properly formatted references
+    - Knowledge graph integration
+    - File saved to vault with confirmation
+    - Path to created document
+    Formatted as Obsidian markdown saved to vault
+  agent: publisher

@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[co]
+*.pyo
+*.pyd
+*.pdb
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# Pytest
+.pytest_cache/
+
+# Logs
+*.log
+logs/
+
+# Output and data
+outputs/
+data/chromadb/
+
+# Node.js
+node_modules/
+package-lock.json
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.env
+example.env
+
+# Misc
+out.out
+uv.lock
+
+# Test artifacts
+tests/__pycache__/
+tests/.pytest_cache/
+tests/testOut.log
+
+# Ignore lock files
+Pipfile.lock
+yarn.lock
+
+# Ignore coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# Ignore temp
+*.tmp
+*.temp

@@ -1,0 +1,352 @@
+{
+  "project_metadata": {
+    "name": "CrewAI Research Paper Parser",
+    "version": "1.0.0",
+    "description": "Academic research tool for extracting, structuring, and formatting research papers from Zotero into Obsidian-compatible markdown documents",
+    "technology_stack": {
+      "package_manager": "uv",
+      "framework": "CrewAI",
+      "testing": "PyTest",
+      "integration": "MCP Servers (local)",
+      "output_format": "Obsidian Markdown"
+    }
+  },
+
+  "system_architecture": {
+    "overview": "Modular agent-based system with sequential processing pipeline",
+    "architecture_diagram": "```mermaid\ngraph TB\n    subgraph \"Input Layer\"\n        UI[User Input/Query]\n        ZR[Zotero Repository]\n    end\n\n    subgraph \"Processing Layer - CrewAI Agents\"\n        H[Historian Agent]\n        R[Researcher Agent] \n        A[Archivist Agent]\n        P[Publisher Agent]\n    end\n\n    subgraph \"MCP Server Layer\"\n        ST[server-sequential-thinking]\n        SM[server-memory]\n        SF[server-filesystem]\n        C7[context7]\n        ZM[zotero-mcp]\n        OM[obsidian-mcp-tools]\n    end\n\n    subgraph \"Output Layer\"\n        JS[JSON Schema]\n        MD[Obsidian Markdown]\n        OV[Obsidian Vault]\n    end\n\n    UI --> H\n    ZR --> R\n    H --> R\n    R --> A\n    A --> P\n    \n    H -.-> SM\n    H -.-> C7\n    R -.-> ZM\n    R -.-> ST\n    A -.-> SF\n    A -.-> ST\n    P -.-> OM\n    P -.-> SF\n    \n    A --> JS\n    P --> MD\n    MD --> OV\n```",
+    
+    "core_principles": {
+      "modularity": "Each agent has single responsibility and clear interfaces",
+      "sequential_processing": "Linear data flow with checkpoints at each stage",
+      "mcp_integration": "Loose coupling through MCP server abstraction",
+      "testability": "Each component independently testable with toggle capability",
+      "extensibility": "Plugin architecture for additional paper sources and output formats"
+    },
+
+    "directory_structure": {
+      "structure": "```\nresearch_paper_parser/\n├── pyproject.toml                 # uv project configuration\n├── README.md\n├── .env.example\n├── src/\n│   └── research_parser/\n│       ├── __init__.py\n│       ├── main.py               # CLI entry point\n│       ├── config/\n│       │   ├── __init__.py\n│       │   ├── agents.yaml       # Agent configurations\n│       │   ├── tasks.yaml        # Task definitions\n│       │   └── mcp_servers.yaml  # MCP server configurations\n│       ├── crew/\n│       │   ├── __init__.py\n│       │   ├── research_crew.py  # Main crew orchestration\n│       │   └── crew_base.py      # Base crew functionality\n│       ├── agents/\n│       │   ├── __init__.py\n│       │   ├── historian.py      # Memory/context agent\n│       │   ├── researcher.py     # Zotero interface agent\n│       │   ├── archivist.py      # JSON structuring agent\n│       │   └── publisher.py      # Markdown generation agent\n│       ├── tools/\n│       │   ├── __init__.py\n│       │   ├── mcp_manager.py    # MCP server management\n│       │   ├── zotero_tools.py   # Zotero-specific operations\n│       │   ├── memory_tools.py   # Memory management utilities\n│       │   └── obsidian_tools.py # Obsidian integration\n│       ├── schemas/\n│       │   ├── __init__.py\n│       │   ├── research_paper.py # Pydantic models for JSON schema\n│       │   └── obsidian_meta.py  # Obsidian metadata models\n│       └── utils/\n│           ├── __init__.py\n│           ├── validators.py     # Input/output validation\n│           ├── formatters.py     # Content formatting utilities\n│           └── exceptions.py     # Custom exception classes\n├── tests/\n│   ├── __init__.py\n│   ├── conftest.py              # PyTest configuration\n│   ├── unit/\n│   │   ├── test_agents/         # Individual agent tests\n│   │   ├── test_tools/          # Tool integration tests\n│   │   └── test_schemas/        # Schema validation tests\n│   ├── integration/\n│   │   ├── test_crew/           # Full crew workflow tests\n│   │   └── test_mcp/            # MCP server integration tests\n│   └── fixtures/\n│       ├── sample_papers/       # Test paper data\n│       └── mock_responses/      # Mock MCP responses\n└── docs/\n    ├── architecture.md\n    ├── api_reference.md\n    └── user_guide.md\n```"
+    }
+  },
+
+  "agent_architecture": {
+    "overview": "Four specialized agents with sequential processing and clear handoff protocols",
+    "agent_flow_diagram": "```mermaid\nsequenceDiagram\n    participant U as User\n    participant H as Historian\n    participant R as Researcher\n    participant A as Archivist\n    participant P as Publisher\n    participant MCP as MCP Servers\n    \n    U->>H: Paper query/identifier\n    H->>MCP: Retrieve context (memory, context7)\n    MCP-->>H: Historical context\n    H->>R: Enriched query + context\n    \n    R->>MCP: Search Zotero (zotero-mcp)\n    MCP-->>R: Paper metadata + content\n    R->>MCP: Extract content (sequential-thinking)\n    MCP-->>R: Structured extraction\n    R->>A: Raw paper data + metadata\n    \n    A->>MCP: Structure data (sequential-thinking)\n    MCP-->>A: Validation feedback\n    A->>A: Apply JSON schema\n    A->>P: Validated JSON structure\n    \n    P->>MCP: Generate markdown (obsidian-mcp, filesystem)\n    MCP-->>P: Template processing\n    P->>MCP: Save to vault (filesystem)\n    P-->>U: Completed Obsidian document\n```",
+
+    "agents": {
+      "historian": {
+        "role": "Memory and Context Manager",
+        "responsibilities": [
+          "Initialize and refresh persistent memory state",
+          "Retrieve relevant historical context from previous papers",
+          "Implement bidirectional thinking for context optimization",
+          "Prepare enriched context for downstream agents"
+        ],
+        "mcp_dependencies": ["server-memory", "context7"],
+        "inputs": "User query/paper identifier",
+        "outputs": "Enriched query with historical context",
+        "key_methods": [
+          "refresh_memory_state()",
+          "retrieve_historical_context()",
+          "apply_bidirectional_thinking()",
+          "prepare_enriched_context()"
+        ]
+      },
+
+      "researcher": {
+        "role": "Paper Discovery and Content Extraction",
+        "responsibilities": [
+          "Interface with Zotero to locate target paper",
+          "Extract full content including metadata, text, references",
+          "Perform initial content analysis and structure identification",
+          "Handle various paper formats (PDF, HTML, etc.)"
+        ],
+        "mcp_dependencies": ["zotero-mcp", "server-sequential-thinking"],
+        "inputs": "Enriched query + context from Historian",
+        "outputs": "Raw paper data with metadata and content",
+        "key_methods": [
+          "search_zotero_library()",
+          "extract_paper_content()",
+          "analyze_paper_structure()",
+          "validate_extraction_quality()"
+        ]
+      },
+
+      "archivist": {
+        "role": "Data Structuring and Schema Compliance",
+        "responsibilities": [
+          "Transform raw paper data into JSON schema format",
+          "Validate data completeness and accuracy",
+          "Apply intelligent summarization for content sections",
+          "Ensure schema compliance with Obsidian requirements"
+        ],
+        "mcp_dependencies": ["server-sequential-thinking", "server-filesystem"],
+        "inputs": "Raw paper data + metadata from Researcher",
+        "outputs": "Validated JSON structure conforming to schema",
+        "key_methods": [
+          "apply_json_schema()",
+          "validate_data_completeness()",
+          "generate_intelligent_summaries()",
+          "ensure_obsidian_compatibility()"
+        ]
+      },
+
+      "publisher": {
+        "role": "Markdown Generation and Vault Integration",
+        "responsibilities": [
+          "Convert JSON structure to Obsidian markdown format",
+          "Generate appropriate tags, aliases, and metadata",
+          "Create knowledge graph connections and backlinks",
+          "Save formatted document to Obsidian vault"
+        ],
+        "mcp_dependencies": ["obsidian-mcp-tools", "server-filesystem"],
+        "inputs": "Validated JSON structure from Archivist",
+        "outputs": "Formatted Obsidian document in vault",
+        "key_methods": [
+          "convert_json_to_markdown()",
+          "generate_obsidian_metadata()",
+          "create_knowledge_connections()",
+          "save_to_vault()"
+        ]
+      }
+    }
+  },
+
+  "mcp_integration_architecture": {
+    "overview": "Centralized MCP server management with agent-specific tool routing",
+    "mcp_architecture_diagram": "```mermaid\ngraph TB\n    subgraph \"MCP Manager Layer\"\n        MM[MCP Manager]\n        CR[Connection Registry]\n        TF[Tool Factory]\n    end\n    \n    subgraph \"MCP Servers\"\n        ST[server-sequential-thinking]\n        SM[server-memory]\n        SF[server-filesystem]\n        C7[context7]\n        ZM[zotero-mcp]\n        OM[obsidian-mcp-tools]\n    end\n    \n    subgraph \"Agent Tool Interfaces\"\n        HT[Historian Tools]\n        RT[Researcher Tools]\n        AT[Archivist Tools]\n        PT[Publisher Tools]\n    end\n    \n    MM --> CR\n    MM --> TF\n    \n    CR -.-> ST\n    CR -.-> SM\n    CR -.-> SF\n    CR -.-> C7\n    CR -.-> ZM\n    CR -.-> OM\n    \n    TF --> HT\n    TF --> RT\n    TF --> AT\n    TF --> PT\n    \n    HT -.-> SM\n    HT -.-> C7\n    RT -.-> ZM\n    RT -.-> ST\n    AT -.-> ST\n    AT -.-> SF\n    PT -.-> OM\n    PT -.-> SF\n```",
+
+    "mcp_servers": {
+      "server-sequential-thinking": {
+        "purpose": "Multi-step reasoning and complex analysis",
+        "used_by": ["researcher", "archivist"],
+        "key_operations": [
+          "Complex content analysis",
+          "Multi-step data transformation",
+          "Reasoning chain validation"
+        ]
+      },
+      "server-memory": {
+        "purpose": "Persistent knowledge graph and context storage",
+        "used_by": ["historian"],
+        "key_operations": [
+          "Memory state management",
+          "Historical context retrieval",
+          "Knowledge graph operations"
+        ]
+      },
+      "server-filesystem": {
+        "purpose": "File operations and directory management",
+        "used_by": ["archivist", "publisher"],
+        "key_operations": [
+          "File I/O operations",
+          "Directory structure management",
+          "Content caching and storage"
+        ]
+      },
+      "context7": {
+        "purpose": "Enhanced context management and retrieval",
+        "used_by": ["historian"],
+        "key_operations": [
+          "Context optimization",
+          "Library documentation access",
+          "Knowledge enrichment"
+        ]
+      },
+      "zotero-mcp": {
+        "purpose": "Zotero library integration and paper retrieval",
+        "used_by": ["researcher"],
+        "key_operations": [
+          "Library search and filtering",
+          "Paper content extraction",
+          "Metadata retrieval"
+        ]
+      },
+      "obsidian-mcp-tools": {
+        "purpose": "Obsidian vault integration and note management",
+        "used_by": ["publisher"],
+        "key_operations": [
+          "Note creation and formatting",
+          "Vault structure management",
+          "Tag and link generation"
+        ]
+      }
+    }
+  },
+
+  "testing_architecture": {
+    "overview": "Comprehensive testing strategy with modular component isolation",
+    "testing_strategy_diagram": "```mermaid\ngraph TB\n    subgraph \"Unit Tests\"\n        AU[Agent Unit Tests]\n        TU[Tool Unit Tests]\n        SU[Schema Unit Tests]\n        MU[MCP Unit Tests]\n    end\n    \n    subgraph \"Integration Tests\"\n        AI[Agent Integration]\n        MI[MCP Integration]\n        CI[Crew Integration]\n        EI[End-to-End Integration]\n    end\n    \n    subgraph \"Mock/Fixture Layer\"\n        MP[Mock Papers]\n        MR[Mock MCP Responses]\n        TD[Test Data]\n        TF[Test Fixtures]\n    end\n    \n    subgraph \"Testing Controls\"\n        TC[Toggle Controls]\n        IM[Isolation Manager]\n        TR[Test Runner]\n    end\n    \n    AU --> AI\n    TU --> MI\n    SU --> CI\n    MU --> EI\n    \n    MP -.-> AU\n    MR -.-> TU\n    TD -.-> SU\n    TF -.-> MU\n    \n    TC --> IM\n    IM --> TR\n    TR --> AU\n    TR --> AI\n```",
+
+    "testing_levels": {
+      "unit_tests": {
+        "scope": "Individual components in isolation",
+        "target_coverage": "90%+",
+        "test_categories": [
+          "Agent initialization and configuration",
+          "MCP server connection establishment",
+          "Tool method execution",
+          "Schema validation and transformation",
+          "Input/output data validation"
+        ],
+        "mock_requirements": [
+          "Mock MCP server responses",
+          "Mock Zotero data",
+          "Sample paper fixtures",
+          "Test JSON schemas"
+        ]
+      },
+
+      "integration_tests": {
+        "scope": "Component interaction and data flow",
+        "test_categories": [
+          "Agent-to-agent handoff validation",
+          "MCP server integration with real connections",
+          "End-to-end crew workflow",
+          "Error handling and recovery"
+        ],
+        "environment_requirements": [
+          "Local MCP servers running",
+          "Test Obsidian vault",
+          "Sample Zotero library",
+          "Controlled test data"
+        ]
+      },
+
+      "toggle_testing": {
+        "purpose": "Enable selective component testing during development",
+        "implementation": "Environment variables and configuration flags",
+        "toggle_options": [
+          "Individual agent execution",
+          "MCP server bypass modes",
+          "Output format selection",
+          "Validation step skipping"
+        ],
+        "configuration_example": {
+          "ENABLE_HISTORIAN": "true",
+          "ENABLE_RESEARCHER": "false", 
+          "ENABLE_ARCHIVIST": "true",
+          "ENABLE_PUBLISHER": "false",
+          "MOCK_ZOTERO": "true",
+          "MOCK_OBSIDIAN": "false"
+        }
+      }
+    }
+  },
+
+  "data_flow_architecture": {
+    "overview": "Sequential data transformation pipeline with validation checkpoints",
+    "data_flow_diagram": "```mermaid\nflowchart TD\n    UI[User Input] --> H{Historian}\n    H --> |Context Retrieved| R{Researcher}\n    R --> |Paper Extracted| A{Archivist}\n    A --> |JSON Structured| P{Publisher}\n    P --> |Markdown Generated| OV[Obsidian Vault]\n    \n    subgraph \"Data Formats\"\n        UQ[User Query]\n        EC[Enriched Context]\n        PD[Paper Data]\n        JS[JSON Schema]\n        MD[Markdown Document]\n    end\n    \n    subgraph \"Validation Gates\"\n        V1[Input Validation]\n        V2[Extraction Validation]\n        V3[Schema Validation]\n        V4[Output Validation]\n    end\n    \n    UI -.-> V1\n    V1 -.-> UQ\n    H -.-> EC\n    R -.-> V2\n    V2 -.-> PD\n    A -.-> V3\n    V3 -.-> JS\n    P -.-> V4\n    V4 -.-> MD\n```",
+
+    "data_transformations": {
+      "stage_1_historian": {
+        "input_format": "User query string + optional parameters",
+        "processing": "Memory retrieval + context enrichment",
+        "output_format": "Enriched query object with historical context",
+        "validation": "Context completeness and relevance"
+      },
+      "stage_2_researcher": {
+        "input_format": "Enriched query object",
+        "processing": "Zotero search + content extraction + structure analysis",
+        "output_format": "Raw paper object with metadata and content",
+        "validation": "Extraction completeness and format compliance"
+      },
+      "stage_3_archivist": {
+        "input_format": "Raw paper object",
+        "processing": "Schema application + intelligent summarization + validation",
+        "output_format": "JSON object conforming to research paper schema",
+        "validation": "Schema compliance and content quality"
+      },
+      "stage_4_publisher": {
+        "input_format": "Validated JSON object",
+        "processing": "Markdown conversion + metadata generation + vault integration",
+        "output_format": "Formatted Obsidian markdown document",
+        "validation": "Markdown syntax and Obsidian compatibility"
+      }
+    }
+  },
+
+  "configuration_management": {
+    "overview": "Centralized configuration with environment-specific overrides",
+    "config_hierarchy": [
+      "Environment variables (.env)",
+      "Agent configurations (agents.yaml)",
+      "Task definitions (tasks.yaml)", 
+      "MCP server settings (mcp_servers.yaml)",
+      "Runtime parameters (CLI args)"
+    ],
+    
+    "key_configurations": {
+      "crew_settings": {
+        "process_type": "sequential",
+        "verbose_mode": "configurable",
+        "memory_enabled": "true",
+        "planning_enabled": "true"
+      },
+      "mcp_settings": {
+        "connection_timeout": "30s",
+        "retry_attempts": "3",
+        "cache_enabled": "true",
+        "local_servers_only": "true"
+      },
+      "output_settings": {
+        "obsidian_vault_path": "configurable",
+        "markdown_template": "configurable",
+        "tag_generation": "automatic",
+        "backup_enabled": "true"
+      }
+    }
+  },
+
+  "error_handling_strategy": {
+    "overview": "Comprehensive error handling with graceful degradation",
+    "error_categories": [
+      "MCP server connection failures",
+      "Zotero access issues",
+      "Schema validation errors", 
+      "File system permissions",
+      "Content extraction failures"
+    ],
+    
+    "recovery_mechanisms": {
+      "retry_logic": "Exponential backoff for transient failures",
+      "fallback_modes": "Alternative processing paths for missing data",
+      "graceful_degradation": "Partial output generation when possible",
+      "error_logging": "Comprehensive logging for debugging"
+    }
+  },
+
+  "future_extensibility": {
+    "overview": "Plugin architecture for additional capabilities",
+    "extension_points": [
+      "Additional paper sources (arXiv, PubMed APIs)",
+      "Alternative output formats (LaTeX, Notion)",
+      "Enhanced analysis tools (citation analysis, topic modeling)",
+      "Integration with other reference managers"
+    ],
+    
+    "plugin_interface": {
+      "paper_sources": "Abstract base class for new paper providers",
+      "output_formats": "Template system for new output formats",
+      "analysis_tools": "Hook system for additional processing steps",
+      "storage_backends": "Interface for alternative storage systems"
+    }
+  },
+
+  "next_steps": {
+    "immediate_priorities": [
+      "Set up project structure with uv",
+      "Implement MCP manager and connection handling",
+      "Create base agent classes with toggle functionality",
+      "Establish testing framework with mock fixtures"
+    ],
+    
+    "development_phases": {
+      "phase_1": "Core infrastructure and agent framework",
+      "phase_2": "Individual agent implementation with unit tests",
+      "phase_3": "MCP integration and tool development", 
+      "phase_4": "End-to-end workflow and integration testing",
+      "phase_5": "Error handling, validation, and polish"
+    }
+  }
+}
