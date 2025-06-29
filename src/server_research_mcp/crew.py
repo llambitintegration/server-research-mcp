@@ -39,12 +39,41 @@ DISABLE_CREW_MEMORY = os.getenv("DISABLE_CREW_MEMORY", "false").lower() == "true
 if USE_ENHANCED_MCP:
     print("🔧 Enhanced MCP mode enabled - using real MCP servers")
 else:
-    print("🎭 Standard mode - using mock MCP responses for testing")
+    print("🎭 Standard mode - using real MCP servers with CrewAI official patterns")
 
 if DISABLE_CREW_MEMORY:
     print("🧠 Crew memory and planning disabled for compatibility")
 else:
     print("🧠 Crew memory and planning enabled")
+
+# MCPAdapt Integration - Clean and Simple
+# Legacy MCPToolsManager removed - using direct MCPAdapt integration
+    
+def get_crew_mcp_manager():
+    """Get the MCP tools manager for the crew (legacy compatibility)."""
+    # Legacy function - MCPAdapt migration completed, return direct tool access
+    class LegacyMCPManager:
+        @staticmethod
+        def get_historian_tools():
+            from .tools.mcp_tools import get_historian_tools, add_basic_tools
+            return add_basic_tools(get_historian_tools())
+        
+        @staticmethod
+        def get_researcher_tools():
+            from .tools.mcp_tools import get_researcher_tools, add_basic_tools
+            return add_basic_tools(get_researcher_tools())
+        
+        @staticmethod
+        def get_archivist_tools():
+            from .tools.mcp_tools import get_archivist_tools, add_basic_tools
+            return add_basic_tools(get_archivist_tools())
+        
+        @staticmethod
+        def get_publisher_tools():
+            from .tools.mcp_tools import get_publisher_tools, add_basic_tools
+            return add_basic_tools(get_publisher_tools())
+    
+    return LegacyMCPManager()
 
 # Configure LLM based on environment variables
 def get_configured_llm():
@@ -396,7 +425,7 @@ class ServerResearchMcp():
     def historian(self) -> Agent:
         """Memory and Context Manager Agent"""
         logger.info("🧠 Initializing Historian agent with memory tools")
-        tools = get_historian_tools()
+        tools = get_crew_mcp_manager().get_historian_tools()
         logger.info(f"📚 Historian tools loaded: {[tool.name for tool in tools]}")
         
         return Agent(
@@ -412,7 +441,7 @@ class ServerResearchMcp():
     def researcher(self) -> Agent:
         """Paper Discovery and Content Extraction Agent"""
         logger.info("🔬 Initializing Researcher agent with Zotero tools")
-        tools = get_researcher_tools()
+        tools = get_crew_mcp_manager().get_researcher_tools()
         logger.info(f"📖 Researcher tools loaded: {[tool.name for tool in tools]}")
         
         return Agent(
@@ -426,7 +455,7 @@ class ServerResearchMcp():
     def archivist(self) -> Agent:
         """Data Structuring and Schema Compliance Agent"""
         logger.info("📊 Initializing Archivist agent with validation tools")
-        tools = get_archivist_tools()
+        tools = get_crew_mcp_manager().get_archivist_tools()
         logger.info(f"📋 Archivist tools loaded: {[tool.name for tool in tools]}")
         
         return Agent(
@@ -440,7 +469,7 @@ class ServerResearchMcp():
     def publisher(self) -> Agent:
         """Markdown Generation and Vault Integration Agent"""
         logger.info("📝 Initializing Publisher agent with publishing tools")
-        tools = get_publisher_tools()
+        tools = get_crew_mcp_manager().get_publisher_tools()
         logger.info(f"📄 Publisher tools loaded: {[tool.name for tool in tools]}")
         
         return Agent(

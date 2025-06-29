@@ -193,7 +193,7 @@ def run_crew(inputs: Dict[str, Any], verbose: bool = False):
         # Import here to avoid circular imports
         from server_research_mcp.crew import ServerResearchMcp
         
-        # Initialize and run the crew
+        # Initialize and run the crew - MCPAdapt handles its own context management
         crew_instance = ServerResearchMcp()
         crew = crew_instance.crew()  # Get the crew object
         

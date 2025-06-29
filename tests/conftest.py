@@ -289,117 +289,116 @@ def temp_workspace():
 
 @pytest.fixture
 def mock_mcp_manager():
-    """Mock MCP manager to avoid external dependencies."""
-    with patch('server_research_mcp.tools.mcp_manager.get_mcp_manager') as mock:
-        mock_manager = MagicMock()
+    """Mock MCP manager to avoid external dependencies (legacy compatibility)."""
+    # Legacy fixture - MCPAdapt migration completed, but kept for backward compatibility
+    mock_manager = MagicMock()
+    
+    # Counter for unique entity IDs
+    entity_counter = {"count": 0}
+    
+    # Counter for checkpoint failures
+    checkpoint_failure_counter = {"count": 0}
+    
+    # Mock successful responses for different tools
+    def mock_call_tool(tool_name, **kwargs):
+        # Specific memory operations first (before general "memory" check)
+        if tool_name == "memory_create_entity" or "memory_create" in tool_name:
+            entity_counter["count"] += 1
+            result = {
+                "success": True,
+                "entity_id": f"mock-entity-{entity_counter['count']}", 
+                "message": f"Created entity: {kwargs.get('name', 'None')}", 
+                "status": "success"
+            }
+            return result
+        elif "memory_add" in tool_name:
+            return {
+                "success": True,
+                "status": "updated", 
+                "observations_added": len(kwargs.get("observations", []))
+            }
+        elif "memory" in tool_name or tool_name == "memory_search":
+            return {
+                "success": True,
+                "status": "success",
+                "results": [
+                    {"name": "test_entity", "type": "concept", "observations": ["test observation"]}
+                ],
+                "message": f"Found {len([1])} nodes for query: {kwargs.get('query', 'unknown')}"
+            }
+        elif "context7_get_docs" in tool_name:
+            return {
+                "success": True,
+                "confidence": 0.9,
+                "content": "Mock documentation content", 
+                "tokens_used": 100,
+                "sections": [
+                    {"title": "Overview", "content": "Mock overview content"},
+                    {"title": "Usage", "content": "Mock usage content"}
+                ],
+                "status": "success"
+            }
+        elif "context7" in tool_name or tool_name == "context7_resolve_library":
+            return {
+                "success": True,
+                "confidence": 0.95,
+                "library_id": "/test/library", 
+                "found": True,
+                "status": "success"
+            }
+        elif "zotero_get_item" in tool_name:
+            return {
+                "success": True,
+                "title": "Mock Paper Title",
+                "sections": [
+                    {"title": "Introduction", "content": "Mock content"},
+                    {"title": "Methods", "content": "Mock methods"},
+                    {"title": "Results", "content": "Mock results"},
+                    {"title": "Discussion", "content": "Mock discussion"}
+                ],
+                "status": "success"
+            }
+        elif "zotero" in tool_name or tool_name == "zotero_search":
+            return {
+                "success": True,
+                "status": "success",
+                "results": [
+                    {"key": "TEST123", "title": "Mock Paper", "authors": ["Test Author"]}
+                ],
+                "total": 1
+            }
+        elif "sequential_thinking_get_thoughts" in tool_name or tool_name == "sequential_thinking_get_thoughts":
+            return {
+                "status": "success",
+                "thoughts": ["Thought 1", "Thought 2", "Thought 3"],
+                "complete": True
+            }
+        elif "sequential" in tool_name or tool_name == "sequential_thinking_append_thought":
+            return {
+                "status": "recorded", 
+                "thought": "Mock thinking step", 
+                "complete": True
+            }
+        else:
+            return {
+                "success": True,
+                "status": "success", 
+                "data": "mock_response"
+            }
+    
+    mock_manager.call_tool.side_effect = mock_call_tool
+    
+    # Mock async methods
+    async def mock_initialize(servers):
+        return True
         
-        # Counter for unique entity IDs
-        entity_counter = {"count": 0}
-        
-        # Counter for checkpoint failures
-        checkpoint_failure_counter = {"count": 0}
-        
-        # Mock successful responses for different tools
-        def mock_call_tool(tool_name, **kwargs):
-                    # Specific memory operations first (before general "memory" check)
-            if tool_name == "memory_create_entity" or "memory_create" in tool_name:
-                entity_counter["count"] += 1
-                result = {
-                    "success": True,
-                    "entity_id": f"mock-entity-{entity_counter['count']}", 
-                    "message": f"Created entity: {kwargs.get('name', 'None')}", 
-                    "status": "success"
-                }
-                return result
-            elif "memory_add" in tool_name:
-                return {
-                    "success": True,
-                    "status": "updated", 
-                    "observations_added": len(kwargs.get("observations", []))
-                }
-            elif "memory" in tool_name or tool_name == "memory_search":
-                return {
-                    "success": True,
-                    "status": "success",
-                    "results": [
-                        {"name": "test_entity", "type": "concept", "observations": ["test observation"]}
-                    ],
-                    "message": f"Found {len([1])} nodes for query: {kwargs.get('query', 'unknown')}"
-                }
-            elif "context7_get_docs" in tool_name:
-                return {
-                    "success": True,
-                    "confidence": 0.9,
-                    "content": "Mock documentation content", 
-                    "tokens_used": 100,
-                    "sections": [
-                        {"title": "Overview", "content": "Mock overview content"},
-                        {"title": "Usage", "content": "Mock usage content"}
-                    ],
-                    "status": "success"
-                }
-            elif "context7" in tool_name or tool_name == "context7_resolve_library":
-                return {
-                    "success": True,
-                    "confidence": 0.95,
-                    "library_id": "/test/library", 
-                    "found": True,
-                    "status": "success"
-                }
-            elif "zotero_get_item" in tool_name:
-                return {
-                    "success": True,
-                    "title": "Mock Paper Title",
-                    "sections": [
-                        {"title": "Introduction", "content": "Mock content"},
-                        {"title": "Methods", "content": "Mock methods"},
-                        {"title": "Results", "content": "Mock results"},
-                        {"title": "Discussion", "content": "Mock discussion"}
-                    ],
-                    "status": "success"
-                }
-            elif "zotero" in tool_name or tool_name == "zotero_search":
-                return {
-                    "success": True,
-                    "status": "success",
-                    "results": [
-                        {"key": "TEST123", "title": "Mock Paper", "authors": ["Test Author"]}
-                    ],
-                    "total": 1
-                }
-            elif "sequential_thinking_get_thoughts" in tool_name or tool_name == "sequential_thinking_get_thoughts":
-                return {
-                    "status": "success",
-                    "thoughts": ["Thought 1", "Thought 2", "Thought 3"],
-                    "complete": True
-                }
-            elif "sequential" in tool_name or tool_name == "sequential_thinking_append_thought":
-                return {
-                    "status": "recorded", 
-                    "thought": "Mock thinking step", 
-                    "complete": True
-                }
-            else:
-                return {
-                    "success": True,
-                    "status": "success", 
-                    "data": "mock_response"
-                }
-        
-        mock_manager.call_tool.side_effect = mock_call_tool
-        
-        # Mock async methods
-        async def mock_initialize(servers):
-            return True
-            
-        async def mock_async_call_tool(server, tool, arguments):
-            return mock_call_tool(tool, **arguments)
-        
-        mock_manager.initialize = mock_initialize
-        mock_manager.async_call_tool = mock_async_call_tool
-        mock.return_value = mock_manager
-        
-        yield mock_manager
+    async def mock_async_call_tool(server, tool, arguments):
+        return mock_call_tool(tool, **arguments)
+    
+    mock_manager.initialize = mock_initialize
+    mock_manager.async_call_tool = mock_async_call_tool
+    
+    return mock_manager
 
 @pytest.fixture
 def mock_chromadb_config():
@@ -473,9 +472,9 @@ def test_crew_inputs():
         'structured_json': '{"metadata": {"title": "Test", "authors": ["Author"], "year": 2024, "abstract": "Abstract"}, "sections": []}'
     }
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def setup_all_mocks(mock_mcp_manager, mock_chromadb, mock_chromadb_config, mock_rag_storage):
-    """Auto-applied fixture that sets up all necessary mocks."""
+    """Setup all necessary mocks (not auto-applied since MCPAdapt migration)."""
     yield
 
 @pytest.fixture
