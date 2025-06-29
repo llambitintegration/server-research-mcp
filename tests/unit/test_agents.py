@@ -486,5 +486,5 @@ class TestCrewBasics:
         assert crew is not None
         assert len(crew.agents) >= 2
         assert len(crew.tasks) >= 2
-        assert crew.memory is True
+        assert crew.memory is False  # Memory is disabled in tests to avoid ChromaDB issues
         assert crew.verbose is True

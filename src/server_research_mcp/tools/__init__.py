@@ -22,6 +22,17 @@ from .mcp_tools import (
     ZoteroExtractTool,
     SequentialThinkingTool,
     
+    # Publisher Tools (Obsidian & Filesystem)
+    ObsidianCreateNoteTool,
+    ObsidianLinkGeneratorTool,
+    ObsidianPublishNoteTool,
+    ObsidianUpdateMetadataTool,
+    FileSystemWriteTool,
+    
+    # Archivist Tools
+    IntelligentSummaryTool,
+    FileSystemReadTool,
+    
     # Legacy Tools (Preserved for compatibility)
     SchemaValidationTool,
     
@@ -30,6 +41,7 @@ from .mcp_tools import (
     get_context7_tools,
     get_researcher_tools,
     get_archivist_tools,
+    get_publisher_tools,
     get_all_mcp_tools,
     historian_mcp_tools,  # Backward compatibility alias
 )
@@ -41,12 +53,13 @@ from .tool_factory import (
     json_schema_to_pydantic,
     create_tools_from_mcp_schema,
 )
-from .mcp_manager import get_mcp_manager, MCPManager
+# Import the new MCPServerAdapter-based manager as the primary get_mcp_manager
+from .mcp_base_tool import get_mcp_manager
+from .mcp_manager import MCPManager  # Keep old class for compatibility
+from .mcp_adapter_manager import get_mcp_adapter_manager, MCPServerAdapterManager
 
 # Backward compatibility - deprecated but maintained
-def get_publisher_tools():
-    """Deprecated: Use get_context7_tools() or other specific tool collections."""
-    return []
+# get_publisher_tools is now properly implemented in mcp_tools.py
 
 __all__ = [
     # Memory Tools
@@ -71,9 +84,9 @@ __all__ = [
     "get_context7_tools", 
     "get_researcher_tools",
     "get_archivist_tools",
+    "get_publisher_tools",
     "get_all_mcp_tools",
     "historian_mcp_tools",
-    "get_publisher_tools",  # Deprecated
     
     # Infrastructure
     "MCPBaseTool",
@@ -82,4 +95,6 @@ __all__ = [
     "create_tools_from_mcp_schema",
     "get_mcp_manager",
     "MCPManager",
+    "get_mcp_adapter_manager",
+    "MCPServerAdapterManager",
 ]

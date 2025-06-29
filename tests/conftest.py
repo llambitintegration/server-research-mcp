@@ -448,7 +448,8 @@ def mock_rag_storage():
 @pytest.fixture
 def disable_crew_memory():
     """Patch Crew initialization to disable memory without breaking functionality."""
-    original_crew_init = None
+    from crewai.crew import Crew
+    original_crew_init = Crew.__init__
     
     def mock_crew_init(self, *args, **kwargs):
         # Disable memory and planning to avoid ChromaDB issues
@@ -457,11 +458,8 @@ def disable_crew_memory():
         # Call the original constructor
         return original_crew_init(self, *args, **kwargs)
     
-    with patch('crewai.crew.Crew.__init__', side_effect=mock_crew_init) as mock_init:
-        # Store reference to original init
-        from crewai.crew import Crew
-        original_crew_init = Crew.__init__.__wrapped__ if hasattr(Crew.__init__, '__wrapped__') else Crew.__init__
-        yield mock_init
+    with patch.object(Crew, '__init__', mock_crew_init):
+        yield
 
 @pytest.fixture
 def test_crew_inputs():

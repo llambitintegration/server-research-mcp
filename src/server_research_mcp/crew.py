@@ -16,7 +16,8 @@ from .tools import (
     get_historian_tools,
     get_researcher_tools,
     get_archivist_tools,
-    get_context7_tools
+    get_context7_tools,
+    get_publisher_tools
 )
 
 # Import schemas
@@ -438,11 +439,13 @@ class ServerResearchMcp():
     @agent
     def publisher(self) -> Agent:
         """Markdown Generation and Vault Integration Agent"""
-        logger.info("📝 Initializing Publisher agent")
+        logger.info("📝 Initializing Publisher agent with publishing tools")
+        tools = get_publisher_tools()
+        logger.info(f"📄 Publisher tools loaded: {[tool.name for tool in tools]}")
         
         return Agent(
             config=self.agents_config['publisher'],
-            tools=[],  # Basic tools for now - can be extended later
+            tools=tools,
             verbose=True,
             llm=configured_llm
         )
@@ -516,8 +519,7 @@ class ServerResearchMcp():
             process=Process.sequential,
             verbose=True,
             memory=not disable_memory,         # Enable memory for context persistence (unless disabled)
-            planning=not disable_memory,       # Enable planning for better coordination (unless disabled)
-            manager_llm=configured_llm  # Use configured LLM for manager
+            planning=not disable_memory        # Enable planning for better coordination (unless disabled)
         )
         
         logger.info(f"✅ Crew created with {len(crew.agents)} agents and {len(crew.tasks)} tasks")

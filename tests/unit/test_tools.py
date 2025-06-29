@@ -212,3 +212,38 @@ class TestToolErrorHandling:
             assert isinstance(result, str)
             # Should indicate no results found
             assert "no" in result.lower() or "empty" in result.lower() or "[]" in result
+
+
+@pytest.mark.real_servers
+def test_publisher_tools_real_server_integration():
+    """
+    Test publisher tools with real MCP server integration.
+    
+    This test requires obsidian-mcp-tools server to be running.
+    Skipped in CI environments where real servers are not available.
+    
+    To run this test:
+    1. Ensure Node.js and npx are installed
+    2. Configure obsidian-mcp-tools in your MCP client config
+    3. Run: python -m pytest -m "real_servers" tests/
+    """
+    pytest.skip("Real server integration not yet implemented - placeholder for future development")
+    
+    # TODO: Implement real server testing when MCP integration is complete
+    # tools = get_publisher_tools()
+    # 
+    # # Verify we got real tools, not fallback
+    # assert len(tools) == 5
+    # 
+    # # Test actual tool execution against real server
+    # create_tool = next(t for t in tools if t.name == "obsidian_create_note")
+    # result = create_tool._run(
+    #     title="Test Note",
+    #     content="# Test\nThis is a test note",
+    #     folder="Tests"
+    # )
+    # 
+    # # Verify real server response format
+    # import json
+    # response = json.loads(result)
+    # assert response.get("status") != "created_fallback"  # Should be real response

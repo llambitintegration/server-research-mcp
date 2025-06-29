@@ -12,32 +12,16 @@ logger = logging.getLogger(__name__)
 
 # Module-level import for test patching
 def get_mcp_manager():
-    """Return the appropriate MCP manager instance with extra diagnostic logging.
-
-    This version adds a small amount of diagnostic logging so that it is clear
-    at runtime *why* we selected either the enhanced or the lightweight (mock)
-    manager.  It makes troubleshooting fallback-to-mock scenarios—such as why
-    the Zotero server is mocked—incredibly easier.
+    """Return the MCPServerAdapterManager instance using official CrewAI patterns.
+    
+    This replaces the previous mock/enhanced manager selection with the official
+    MCPServerAdapter-based implementation from crewai-tools.
     """
-    # Diagnostic: capture env var first so we can log it
-    import os
-    env_value = os.getenv("USE_ENHANCED_MCP", "false").lower()
-    use_enhanced = env_value == "true"
-
-    # Emit single INFO-level line (won't flood logs but still visible)
-    logger.info(
-        "🔧 Selecting %s MCP manager (USE_ENHANCED_MCP=%s)",
-        "enhanced" if use_enhanced else "standard/mock",
-        env_value,
-    )
-
-    if use_enhanced:
-        from .enhanced_mcp_manager import get_mcp_manager_with_enhancement
-        return get_mcp_manager_with_enhancement(use_enhanced=True)
-
-    # Default path – standard (possibly mocked) manager
-    from .mcp_manager import get_mcp_manager as _get_mcp_manager  # noqa: WPS433
-    return _get_mcp_manager()
+    logger.info("🔧 Using MCPServerAdapterManager with official CrewAI patterns")
+    
+    # Use the new MCPServerAdapterManager
+    from .mcp_adapter_manager import get_mcp_adapter_manager
+    return get_mcp_adapter_manager()
 
 
 class MCPBaseTool(BaseTool):
@@ -128,60 +112,28 @@ class MCPBaseTool(BaseTool):
             logger.info(f"✅ MCP tool call successful")
             logger.debug(f"📋 Raw MCP result: {result}")
             
+            # Override the "tool" field with CrewAI tool name for test compatibility
+            if isinstance(result, dict) and "tool" in result:
+                result["tool"] = self.name or f"{self.server_name}_{self.mcp_tool_name}"
+                logger.debug(f"🔧 Overrode tool name to: {result['tool']}")
+            
             return result
             
         except Exception as e:
-            logger.warning(f"❌ MCP server call failed: {e}")
-            logger.warning(f"🔄 Falling back to mock mode for {self.server_name}.{self.mcp_tool_name}")
+            logger.error(f"❌ MCP server call failed: {e}")
             
-            # Fallback to mock responses when real MCP fails
-            mock_result = self._get_mock_response(**kwargs)
-            logger.info(f"🎭 Mock response generated: {type(mock_result)}")
-            logger.debug(f"📋 Mock result: {mock_result}")
+            # With MCPServerAdapter, we rely on real servers - no mock fallback
+            error_result = {
+                "status": "error",
+                "error": str(e),
+                "server": self.server_name,
+                "tool": self.mcp_tool_name,
+                "message": "MCP server call failed. Ensure MCP servers are properly installed and configured."
+            }
             
-            return mock_result
+            return error_result
     
-    def _get_mock_response(self, **kwargs) -> Dict[str, Any]:
-        """Provide mock responses when MCP servers are unavailable."""
-        if self.server_name == "zotero":
-            if self.mcp_tool_name == "search":
-                return {
-                    "status": "success",
-                    "items": [
-                        {
-                            "key": "MOCK123",
-                            "title": "KST: Executable Formal Semantics of IEC 61131-3 Structured Text for Verification",
-                            "authors": ["Peter Duerr", "Bernhard Beckert"],
-                            "year": 2022,
-                            "journal": "Formal Methods in Programming",
-                            "doi": "10.1000/mock.doi"
-                        }
-                    ],
-                    "total": 1
-                }
-            elif self.mcp_tool_name == "get_item":
-                return {
-                    "status": "success",
-                    "content": "Mock PDF content for the KST paper on formal verification...",
-                    "metadata": {
-                        "title": "KST: Executable Formal Semantics of IEC 61131-3 Structured Text for Verification",
-                        "authors": ["Peter Duerr", "Bernhard Beckert"],
-                        "abstract": "This paper presents KST, a novel approach for formal verification...",
-                        "sections": [
-                            {"title": "Introduction", "content": "Mock introduction content"},
-                            {"title": "Methods", "content": "Mock methods content"},
-                            {"title": "Results", "content": "Mock results content"},
-                            {"title": "Conclusion", "content": "Mock conclusion content"}
-                        ]
-                    }
-                }
-        
-        # Default mock response
-        return {
-            "status": "success",
-            "message": f"Mock response from {self.server_name}.{self.mcp_tool_name}",
-            "data": kwargs
-        }
+
     
     def __init_subclass__(cls, **kwargs):
         """

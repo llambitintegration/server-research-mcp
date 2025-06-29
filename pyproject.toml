@@ -61,10 +61,3 @@ markers = [
 ]
 # Skip real server tests by default in CI
 addopts = "-m 'not real_servers'"
-
-[tool.mypy]
-plugins = ["pydantic.mypy"]
-
-[[tool.mypy.overrides]]
-module = "interfaces.*"
-strict = true

@@ -1,211 +1,186 @@
-# Server Research MCP - Test Suite
+# Test Suite for server-research-mcp
 
-This directory contains the consolidated test suite for the server-research-mcp project.
+This document describes the test suite structure, conventions, and execution patterns for the server-research-mcp project.
 
-## Test Structure
+## Test Organization
 
-The tests are organized into three main categories:
+The test suite is organized into three main categories:
 
-```
-tests/
-├── conftest.py          # Shared fixtures and test configuration
-├── pytest.ini           # Pytest configuration
-├── unit/               # Unit tests for individual components
-│   ├── test_agents.py   # Agent and crew functionality tests
-│   ├── test_tools.py    # MCP tools tests
-│   └── test_validation.py # Validation and user input tests
-├── integration/        # Integration tests for component interactions
-│   ├── test_mcp_servers.py # MCP server integration tests
-│   ├── test_crew_workflow.py # Crew workflow integration tests
-│   └── test_llm.py      # LLM connection and configuration tests
-└── e2e/               # End-to-end workflow tests
-    └── test_research_flow.py # Complete research workflow tests
-```
+### Unit Tests (`tests/unit/`)
+- **Purpose**: Test individual components in isolation
+- **Scope**: Single functions, classes, or modules
+- **Dependencies**: Minimal external dependencies, extensive mocking
+- **Execution**: Fast, reliable, no external services required
 
-## Running Tests
+### Integration Tests (`tests/integration/`)
+- **Purpose**: Test component interactions and workflows
+- **Scope**: Multiple components working together
+- **Dependencies**: Some external services (mocked by default)
+- **Execution**: Moderate speed, may require specific configuration
 
-### Run All Tests
-```bash
-pytest
-```
-
-### Run Specific Test Categories
-```bash
-# Unit tests only
-pytest tests/unit/
-
-# Integration tests only
-pytest tests/integration/
-
-# End-to-end tests only
-pytest tests/e2e/
-```
-
-### Run Tests by Marker
-```bash
-# Skip slow tests
-pytest -m "not slow"
-
-# Run only tests that don't require external services
-pytest -m "not requires_llm and not requires_mcp"
-
-# Run only unit tests
-pytest -m unit
-```
-
-### Run Specific Test Files
-```bash
-pytest tests/unit/test_agents.py
-pytest tests/integration/test_mcp_servers.py -v
-```
+### End-to-End Tests (`tests/e2e/`)
+- **Purpose**: Test complete workflows from start to finish
+- **Scope**: Full system behavior
+- **Dependencies**: External services, real data flows
+- **Execution**: Slower, requires full environment setup
 
 ## Test Markers
 
-- `@pytest.mark.slow` - Long-running tests
-- `@pytest.mark.requires_llm` - Tests requiring LLM API access
-- `@pytest.mark.requires_mcp` - Tests requiring MCP server connections
-- `@pytest.mark.unit` - Unit tests
-- `@pytest.mark.integration` - Integration tests
-- `@pytest.mark.e2e` - End-to-end tests
+The test suite uses pytest markers to categorize tests by their requirements and characteristics:
 
-## Environment Setup
+### Core Markers
+- `@pytest.mark.unit`: Unit tests for individual components
+- `@pytest.mark.integration`: Integration tests for component interactions  
+- `@pytest.mark.e2e`: End-to-end workflow tests
+- `@pytest.mark.slow`: Tests that take significant time to complete
+- `@pytest.mark.performance`: Performance benchmarking tests
 
-### Required Environment Variables
+### Dependency Markers
+- `@pytest.mark.requires_llm`: Tests requiring LLM API access
+- `@pytest.mark.requires_mcp`: Tests requiring MCP server connections
+- `@pytest.mark.real_servers`: Tests requiring real MCP server connections
+- `@pytest.mark.real_integration`: Tests requiring real external services
 
-For full test suite execution, set these environment variables:
+### MCP Server Testing Strategy
 
+The test suite implements a sophisticated strategy for testing MCP (Model Context Protocol) tools:
+
+#### Publisher Tools Dynamic/Fallback Logic
+
+The `get_publisher_tools()` function implements a dynamic loading strategy:
+
+1. **Primary Mode**: Attempts to connect to real MCP servers (e.g., `obsidian-mcp-tools`)
+2. **Fallback Mode**: Uses Pydantic-compatible dummy implementations when servers are unavailable
+
+**Publisher Tools Available**:
+- `obsidian_create_note`: Create notes in Obsidian vault
+- `obsidian_link_generator`: Generate links between notes
+- `filesystem_write`: Write files to filesystem
+- `obsidian_publish_note`: Publish notes to external platforms
+- `obsidian_update_metadata`: Update note metadata
+
+**Implementation Details**:
+- All tools inherit from `BaseTool` with proper Pydantic schemas
+- Fallback tools return structured JSON responses for testing
+- Real tools connect to MCP servers when available
+- Graceful degradation ensures tests pass in CI environments
+
+#### Test Execution Modes
+
+**CI/Basic Testing Mode** (Default):
 ```bash
-# LLM Configuration (choose one provider)
-export LLM_PROVIDER=anthropic  # or 'openai'
-export ANTHROPIC_API_KEY=your_key_here
-# OR
-export OPENAI_API_KEY=your_key_here
-
-# LLM Model (optional, defaults are provided)
-export LLM_MODEL=claude-3-haiku-20240307  # for Anthropic
-# OR
-export LLM_MODEL=gpt-4o-mini  # for OpenAI
+# Runs with fallback tools, no real servers required
+python -m pytest tests/unit/test_parsers.py::TestMCPTools
 ```
 
-### Test-Only Environment
+**Real Server Testing Mode**:
+```bash
+# Runs tests against real MCP servers (requires setup)
+python -m pytest -m "real_servers" tests/
+```
 
-The test suite automatically sets up a test environment with:
-- `TESTING=true`
-- Temporary ChromaDB path
-- ChromaDB reset enabled
+**Skip Real Server Tests**:
+```bash
+# Explicitly skip tests requiring real servers
+python -m pytest -m "not real_servers" tests/
+```
 
-## Common Test Patterns
+#### MCP Server Configuration
 
-### Mocking LLM Calls
+Real MCP servers require proper configuration:
+
+**obsidian-mcp-tools** (Publisher Tools):
+- Requires Node.js and npx
+- Configured via MCP client configuration
+- Provides tools for Obsidian vault interaction
+
+**Other MCP Servers**:
+- `memory`: Knowledge graph operations
+- `context7`: Documentation retrieval
+- `zotero`: Research paper management
+- `sequential-thinking`: Multi-step reasoning
+
+#### Tool Collection Architecture
+
+The tool system uses a plug-and-play architecture:
+
 ```python
-def test_with_mock_llm(mock_llm):
-    """mock_llm fixture provides a mocked LLM instance."""
-    mock_llm.call.return_value = "Mock response"
-    # Your test code here
+# Get tools by agent role
+historian_tools = get_historian_tools()      # Memory + Context7 tools
+researcher_tools = get_researcher_tools()    # Zotero + Thinking tools  
+archivist_tools = get_archivist_tools()      # Schema + Summary + FileSystem tools
+publisher_tools = get_publisher_tools()     # Obsidian + FileSystem tools
+
+# Get all tools organized by category
+all_tools = get_all_mcp_tools()
 ```
 
-### Mocking MCP Servers
-```python
-def test_with_mock_mcp(mock_mcp_manager):
-    """mock_mcp_manager fixture provides a mocked MCP manager."""
-    # Your test code here
-```
+Each tool collection is designed for specific agent roles and use cases, ensuring proper separation of concerns and testability.
 
-### Testing Validation
-```python
-def test_validation(valid_research_output, valid_report_output):
-    """Use pre-defined valid outputs for testing."""
-    # Your test code here
-```
+## Test Execution
 
-## Continuous Integration
-
-For CI environments where LLM APIs and MCP servers are not available:
-
+### Running All Tests
 ```bash
-# Run only tests that don't require external services
-pytest -m "not requires_llm and not requires_mcp"
-
-# Run with coverage reporting
-pytest --cov=src --cov-report=xml -m "not requires_llm and not requires_mcp"
+python -m pytest tests/
 ```
 
-## Debugging Tests
-
-### Verbose Output
+### Running by Category
 ```bash
-pytest -vv tests/unit/test_agents.py::TestAgents::test_researcher_agent
+# Unit tests only
+python -m pytest tests/unit/
+
+# Integration tests only  
+python -m pytest tests/integration/
+
+# End-to-end tests only
+python -m pytest tests/e2e/
 ```
 
-### Show Print Statements
+### Running by Marker
 ```bash
-pytest -s tests/integration/test_mcp_servers.py
+# Fast tests only
+python -m pytest -m "not slow"
+
+# Tests requiring external services
+python -m pytest -m "real_integration"
+
+# Performance tests
+python -m pytest -m "performance"
 ```
 
-### Debug Failed Tests
+### Running Specific Test Patterns
 ```bash
-pytest --pdb --lf  # Drop into debugger on failure, run last failed
+# All MCP tool tests
+python -m pytest -k "test_*_tools"
+
+# Publisher-related tests
+python -m pytest -k "publisher"
+
+# Memory/historian tests
+python -m pytest -k "historian or memory"
 ```
 
-## Test Coverage
+## Configuration
 
-To run tests with coverage reporting:
+### Environment Variables
+- `TESTING=true`: Enables test mode
+- `CHROMADB_PATH`: Temporary directory for test ChromaDB
+- `CHROMADB_ALLOW_RESET=true`: Allows ChromaDB reset in tests
 
-```bash
-# Install coverage plugin
-pip install pytest-cov
+### Test Fixtures
+The test suite provides comprehensive fixtures for:
+- Mock LLM instances
+- Mock crew configurations  
+- Mock MCP managers with tool-specific responses
+- Temporary workspaces and file systems
+- ChromaDB test isolation
 
-# Run with coverage
-pytest --cov=src --cov-report=html --cov-report=term-missing
+### Coverage and Quality
 
-# View HTML report
-open htmlcov/index.html
-```
+The test suite emphasizes:
+- **High Coverage**: Comprehensive test coverage across all components
+- **Isolation**: Tests run independently without side effects
+- **Reliability**: Consistent results across different environments
+- **Performance**: Fast execution for rapid development feedback
 
-## Writing New Tests
-
-1. **Choose the appropriate directory:**
-   - `unit/` for testing individual functions/classes
-   - `integration/` for testing component interactions
-   - `e2e/` for testing complete workflows
-
-2. **Use appropriate fixtures from conftest.py:**
-   - `sample_inputs` - Standard crew inputs
-   - `mock_llm` - Mocked LLM instance
-   - `mock_mcp_manager` - Mocked MCP manager
-   - `valid_research_output` - Valid research output example
-   - `valid_report_output` - Valid report output example
-
-3. **Mark tests appropriately:**
-   ```python
-   @pytest.mark.slow
-   @pytest.mark.requires_llm
-   def test_real_llm_call():
-       # Test code
-   ```
-
-4. **Follow naming conventions:**
-   - Test files: `test_*.py`
-   - Test classes: `Test*`
-   - Test functions: `test_*`
-
-## Troubleshooting
-
-### ChromaDB Issues
-If you see ChromaDB-related errors, ensure the test environment is properly set up:
-```python
-# This is handled automatically by conftest.py
-os.environ['CHROMADB_ALLOW_RESET'] = 'true'
-```
-
-### MCP Server Tests Failing
-MCP tests require Node.js and npx. To skip these tests:
-```bash
-pytest -m "not requires_mcp"
-```
-
-### LLM Tests Failing
-Ensure you have valid API keys set in your environment or skip:
-```bash
-pytest -m "not requires_llm"
-```
+For detailed information about specific test patterns or adding new tests, see the individual test files and their docstrings.
