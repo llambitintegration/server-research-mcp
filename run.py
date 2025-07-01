@@ -2,6 +2,14 @@
 """Run the Server Research MCP crew."""
 
 import sys
+import os
+from pathlib import Path
+
+# Add src directory to Python path
+current_dir = Path(__file__).parent
+src_dir = current_dir / "src"
+sys.path.insert(0, str(src_dir))
+
 from server_research_mcp import run, train, replay, test
 
 

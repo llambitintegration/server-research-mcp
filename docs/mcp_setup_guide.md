@@ -353,6 +353,146 @@ pm2 status
 pm2 logs
 ```
 
+## Schema Propagation
+
+### Overview
+
+The MCP tool wrapper system implements comprehensive schema propagation to ensure proper parameter validation and tool interface consistency. This system handles the complex task of maintaining Pydantic schema information as tools are wrapped and adapted between different execution contexts.
+
+### Implementation Details
+
+#### Schema Sources
+
+Tools can obtain their schema from multiple sources, in order of preference:
+
+1. **Original Tool Schema** - If the original MCP tool has an `args_schema` attribute, it is preserved
+2. **Signature Analysis** - Schema is built dynamically from the `_run` method signature using inspection
+3. **Fallback Schema** - A basic schema with common parameters is created as a last resort
+
+#### Wrapper Preservation
+
+The `MCPToolWrapper` class ensures schema propagation through:
+
+```python
+class MCPToolWrapper(BaseTool):
+    args_schema: Type[BaseModel]  # Explicit class attribute exposure
+    
+    def __init__(self, original_tool: BaseTool):
+        # Step 1a: Read original_tool.args_schema if exists
+        if hasattr(original_tool, 'args_schema') and original_tool.args_schema is not None:
+            args_schema = original_tool.args_schema
+        else:
+            # Step 1b: Build from _run signature
+            args_schema = self._build_schema_from_run_signature(original_tool)
+        
+        super().__init__(..., args_schema=args_schema)
+```
+
+#### Async Tool Patching
+
+When async tools are patched with `_patch_tool`, schema preservation is guaranteed:
+
+```python
+def _patch_tool(tool: BaseTool) -> BaseTool:
+    # Preserve args_schema before patching
+    original_args_schema = getattr(tool, 'args_schema', None)
+    
+    # Perform async-to-sync wrapping...
+    
+    # Restore args_schema after patching
+    if original_args_schema is not None:
+        tool.args_schema = original_args_schema
+    
+    return tool
+```
+
+### Runtime Signature Enforcement
+
+#### Kwargs-Only Interface
+
+All wrapped tools enforce a kwargs-only interface for consistency:
+
+```python
+def _run(self, **kwargs) -> str:  # Step 2a: kwargs-only signature
+    # Convert kwargs to positional only for tools that require it
+    if self._original_tool_needs_positional_args():
+        args, remaining_kwargs = self._convert_kwargs_to_positional(kwargs)
+        return self.original_tool._run(*args, **remaining_kwargs)
+    else:
+        return self.original_tool._run(**kwargs)
+```
+
+#### Parameter Conversion
+
+Tools that originally required positional arguments are automatically detected and handled:
+
+- **Signature Analysis** - Inspect original `_run` method to determine positional requirements
+- **Smart Conversion** - Convert kwargs to positional args based on parameter order
+- **Backward Compatibility** - Maintain support for existing tool calls
+
+### Name Filtering Enhancement
+
+Tool name matching uses normalized comparison for robust filtering:
+
+```python
+def normalize_tool_name(name: str) -> str:
+    """Normalize tool name by removing all non-alphanumeric characters."""
+    return re.sub(r'[^a-z0-9]', '', name.lower())
+
+def filter_tools_by_keywords(tools, keywords):
+    normalized_keywords = [normalize_tool_name(k) for k in keywords]
+    # Match using normalized names...
+```
+
+### Quality Guarantees
+
+#### Zotero Tool Availability
+
+The system guarantees Zotero tool availability when credentials are provided:
+
+```python
+# In _initialise method
+zotero_credentials_exist = bool(os.getenv("ZOTERO_API_KEY")) and bool(os.getenv("ZOTERO_LIBRARY_ID"))
+zotero_tools = [tool for tool in wrapped_tools if 'zotero' in normalize_tool_name(tool.name)]
+
+if zotero_credentials_exist and not zotero_tools:
+    raise Exception("Zotero credentials provided but no Zotero tools loaded - aborting fallback")
+```
+
+#### Schema Validation
+
+Every wrapped tool is guaranteed to have a valid schema:
+
+- Non-None `args_schema` attribute
+- Valid Pydantic BaseModel subclass
+- Proper field definitions with types and defaults
+
+### Testing Requirements
+
+Comprehensive tests verify schema propagation:
+
+```python
+def test_args_schema_propagation():
+    """Verify every wrapped tool has non-None args_schema."""
+    tools = _AdaptHolder.get_all_tools()
+    for tool in tools:
+        assert hasattr(tool, 'args_schema')
+        assert tool.args_schema is not None
+        assert issubclass(tool.args_schema, BaseModel)
+
+def test_parameter_round_trip():
+    """Verify JSON string and kwargs produce identical calls."""
+    # Test both parameter formats produce consistent results
+```
+
+### Best Practices
+
+1. **Always use kwargs** when calling wrapped tools directly
+2. **Check args_schema** before calling tools to understand required parameters
+3. **Handle both success and error responses** consistently
+4. **Use normalized names** when filtering tools by keywords
+5. **Test with both parameter formats** to ensure compatibility
+
 ## API Reference
 
 ### MCP Manager

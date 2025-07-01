@@ -18,13 +18,25 @@ class TestCrewInitialization:
         
     def test_crew_with_custom_config(self, test_environment, mock_llm):
         """Test crew initialization with custom configuration."""
-        with patch('server_research_mcp.crew.get_configured_llm', return_value=mock_llm):
-            crew_instance = ServerResearchMcp()
-            crew = crew_instance.crew()
-            
-            assert crew.process == Process.sequential
-            assert crew.verbose is True
-            assert crew.memory is True
+        # Temporarily enable memory for this test
+        import os
+        original_memory_setting = os.environ.get("DISABLE_CREW_MEMORY")
+        os.environ["DISABLE_CREW_MEMORY"] = "false"
+        
+        try:
+            with patch('server_research_mcp.crew.get_configured_llm', return_value=mock_llm):
+                crew_instance = ServerResearchMcp()
+                crew = crew_instance.crew()
+                
+                assert crew.process == Process.sequential
+                assert crew.verbose is True
+                assert crew.memory is True
+        finally:
+            # Restore original setting
+            if original_memory_setting is None:
+                os.environ.pop("DISABLE_CREW_MEMORY", None)
+            else:
+                os.environ["DISABLE_CREW_MEMORY"] = original_memory_setting
     
     def test_crew_agent_count(self, mock_crew):
         """Test that crew has the correct number of agents."""

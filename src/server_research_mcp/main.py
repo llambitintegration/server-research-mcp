@@ -286,9 +286,6 @@ def main_with_args(args):
     if result:
         print("\n📊 Results Summary:")
         print(f"   - Enriched Query: {args.output_dir}/enriched_query.json")
-        print(f"   - Raw Paper Data: {args.output_dir}/raw_paper_data.json")
-        print(f"   - Structured Paper: {args.output_dir}/structured_paper.json")
-        print(f"   - Published Paper: {args.output_dir}/published_paper.md")
         
         # Check if Obsidian note was created
         vault_path = os.getenv("OBSIDIAN_VAULT_PATH")

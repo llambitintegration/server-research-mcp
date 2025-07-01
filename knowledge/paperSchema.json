@@ -1,0 +1,483 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Research Paper Documentation Schema",
+    "type": "object",
+    "required": ["metadata", "content", "references", "obsidian_config"],
+    "properties": {
+      "metadata": {
+        "type": "object",
+        "required": ["title", "authors", "publication_date", "doi", "paper_type"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Full title of the paper"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "affiliation"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Author's full name"
+                },
+                "affiliation": {
+                  "type": "string",
+                  "description": "Author's institutional affiliation"
+                },
+                "orcid": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$",
+                  "description": "ORCID identifier if available"
+                },
+                "corresponding": {
+                  "type": "boolean",
+                  "description": "Whether this is the corresponding author"
+                }
+              }
+            }
+          },
+          "publication_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Publication date in YYYY-MM-DD format"
+          },
+          "doi": {
+            "type": "string",
+            "pattern": "^10\\.\\d{4,}/[-._;()/:a-zA-Z0-9]+$",
+            "description": "Digital Object Identifier"
+          },
+          "arxiv_id": {
+            "type": "string",
+            "pattern": "^\\d{4}\\.\\d{4,5}(v\\d+)?$",
+            "description": "arXiv identifier if applicable"
+          },
+          "journal": {
+            "type": "string",
+            "description": "Journal or conference name"
+          },
+          "volume": {
+            "type": "string",
+            "description": "Journal volume"
+          },
+          "issue": {
+            "type": "string",
+            "description": "Journal issue"
+          },
+          "pages": {
+            "type": "string",
+            "description": "Page range (e.g., '1-10')"
+          },
+          "paper_type": {
+            "type": "string",
+            "enum": ["journal_article", "conference_paper", "preprint", "technical_report", "thesis"],
+            "description": "Type of publication"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Author-provided keywords"
+          },
+          "funding": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "agency": {
+                  "type": "string"
+                },
+                "grant_number": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "content": {
+        "type": "object",
+        "required": ["abstract", "sections", "key_contributions"],
+        "properties": {
+          "abstract": {
+            "type": "string",
+            "description": "Paper abstract"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["title", "content", "section_number"],
+              "properties": {
+                "section_number": {
+                  "type": "string",
+                  "description": "Section number (e.g., '1', '2.1', '3.2.1')"
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Section title"
+                },
+                "content": {
+                  "type": "string",
+                  "description": "Section content in markdown format"
+                },
+                "subsections": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/properties/content/properties/sections/items"
+                  }
+                },
+                "figures": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "figure_number": {
+                        "type": "string"
+                      },
+                      "caption": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "Extended description for accessibility"
+                      }
+                    }
+                  }
+                },
+                "tables": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "table_number": {
+                        "type": "string"
+                      },
+                      "caption": {
+                        "type": "string"
+                      },
+                      "headers": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "data": {
+                        "type": "array",
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "equations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "equation_number": {
+                        "type": "string"
+                      },
+                      "latex": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "key_contributions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Main contributions of the paper"
+          },
+          "methodology": {
+            "type": "object",
+            "properties": {
+              "approach": {
+                "type": "string",
+                "description": "High-level methodological approach"
+              },
+              "datasets": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                }
+              },
+              "tools": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                }
+              },
+              "evaluation_metrics": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "results": {
+            "type": "object",
+            "properties": {
+              "summary": {
+                "type": "string"
+              },
+              "key_findings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "performance_metrics": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "metric": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "context": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Stated limitations of the work"
+          },
+          "future_work": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Suggested future research directions"
+          }
+        }
+      },
+      "references": {
+        "type": "object",
+        "required": ["cited_papers", "citation_count"],
+        "properties": {
+          "cited_papers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["title", "authors", "year"],
+              "properties": {
+                "reference_id": {
+                  "type": "string",
+                  "description": "In-text citation identifier (e.g., '[1]', 'Smith2023')"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "authors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "year": {
+                  "type": "integer"
+                },
+                "doi": {
+                  "type": "string",
+                  "pattern": "^10\\.\\d{4,}/[-._;()/:a-zA-Z0-9]+$",
+                  "description": "DOI if available - critical for clustering"
+                },
+                "venue": {
+                  "type": "string",
+                  "description": "Journal or conference"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "citation_contexts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "section": {
+                        "type": "string"
+                      },
+                      "context": {
+                        "type": "string",
+                        "description": "Surrounding text where citation appears"
+                      },
+                      "purpose": {
+                        "type": "string",
+                        "enum": ["background", "methodology", "comparison", "support", "contrast", "extension"],
+                        "description": "Purpose of the citation"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "citation_count": {
+            "type": "integer",
+            "description": "Total number of references"
+          },
+          "self_citations": {
+            "type": "integer",
+            "description": "Number of self-citations"
+          }
+        }
+      },
+      "obsidian_config": {
+        "type": "object",
+        "required": ["filename", "folder_path", "tags", "aliases"],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Suggested filename for Obsidian note (without .md extension)"
+          },
+          "folder_path": {
+            "type": "string",
+            "description": "Suggested folder structure (e.g., 'Research/ComputerScience/NLP')"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^#[a-zA-Z][a-zA-Z0-9_-]*$"
+            },
+            "description": "Obsidian tags for categorization"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Alternative titles or abbreviations"
+          },
+          "related_notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "relationship": {
+                  "type": "string",
+                  "enum": ["extends", "contradicts", "supports", "applies", "reviews", "cites"]
+                },
+                "doi": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "graph_metadata": {
+            "type": "object",
+            "properties": {
+              "node_color": {
+                "type": "string",
+                "description": "Suggested color for graph visualization based on paper type or field"
+              },
+              "node_size": {
+                "type": "string",
+                "enum": ["small", "medium", "large"],
+                "description": "Suggested node size based on paper importance/citations"
+              },
+              "cluster_id": {
+                "type": "string",
+                "description": "Primary DOI for clustering related papers"
+              }
+            }
+          }
+        }
+      },
+      "extraction_metadata": {
+        "type": "object",
+        "properties": {
+          "extraction_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extraction_method": {
+            "type": "string"
+          },
+          "confidence_scores": {
+            "type": "object",
+            "properties": {
+              "overall": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "metadata": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "content": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "references": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "Any issues or ambiguities encountered during extraction"
+          }
+        }
+      }
+    }
+  }
