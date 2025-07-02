@@ -160,11 +160,18 @@ class TestUserInput:
         assert topic == 'Valid Topic'
         assert mock_input.call_count == 4
         
-    @patch('builtins.input', side_effect=['Machine Learning', 'n'])
     @patch('sys.exit')
-    def test_get_user_input_cancellation(self, mock_exit, mock_input):
+    @patch('builtins.input', side_effect=['Machine Learning', 'n'])
+    def test_get_user_input_cancellation(self, mock_input, mock_exit):
         """Test user can cancel input process."""
-        get_user_input()
+        # Configure sys.exit to raise SystemExit for testing
+        mock_exit.side_effect = SystemExit(0)
+        
+        with pytest.raises(SystemExit) as exc_info:
+            get_user_input()
+        
+        # Verify the exit code is 0 (clean exit)
+        assert exc_info.value.code == 0
         mock_exit.assert_called_once_with(0)
         
     @patch('builtins.input', side_effect=['Research Topic', 'Y'])

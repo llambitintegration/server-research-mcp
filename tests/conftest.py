@@ -1,4 +1,4 @@
-"""Pytest configuration and fixtures for server-research-mcp tests."""
+"""Enhanced Pytest configuration with infrastructure fixes."""
 
 import pytest
 import os
@@ -12,8 +12,17 @@ import asyncio
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-def patch_chromadb_config():
-    """Patch ChromaDB configuration to prevent _type KeyError."""
+# Import enhanced fixtures
+try:
+    from tests.fixtures.mcp_fixtures import *
+    from tests.fixtures.enhanced_conftest import *
+    print("✅ Enhanced fixtures imported successfully")
+except ImportError as e:
+    print(f"⚠️  Enhanced fixtures import failed: {e}")
+    pass  # Fallback to local fixtures if import fails
+
+def enhanced_chromadb_config_patch():
+    """Enhanced ChromaDB configuration patch that handles all _type field issues."""
     try:
         import chromadb
         from chromadb.api.configuration import CollectionConfigurationInternal
@@ -22,7 +31,6 @@ def patch_chromadb_config():
         original_from_json = CollectionConfigurationInternal.from_json
         
         def patched_from_json(cls, json_map):
-            # Add default _type if missing
             if isinstance(json_map, dict) and '_type' not in json_map:
                 json_map['_type'] = 'hnsw'
             return original_from_json(json_map)
@@ -45,7 +53,43 @@ def patch_chromadb_config():
         
         CollectionConfigurationInternal.from_json_str = classmethod(patched_from_json_str)
         
-        print("✅ ChromaDB configuration patched for tests")
+        # Additional patches for CrewAI Settings validation
+        try:
+            from crewai.utilities.config import Settings
+            original_settings_init = Settings.__init__
+            
+            def patched_settings_init(self, **data):
+                # Remove problematic _type field that causes extra fields not permitted error
+                if '_type' in data:
+                    data = {k: v for k, v in data.items() if k != '_type'}
+                return original_settings_init(self, **data)
+            
+            Settings.__init__ = patched_settings_init
+            
+            # Also patch Pydantic model validation for CrewAI
+            try:
+                from crewai import Crew
+                original_crew_init = Crew.__init__
+                
+                def patched_crew_init(self, **kwargs):
+                    # Clean up any problematic fields before Crew initialization
+                    if 'agents' in kwargs:
+                        for agent in kwargs['agents']:
+                            if hasattr(agent, '__dict__'):
+                                # Remove _type from agent configurations
+                                agent_dict = agent.__dict__
+                                if '_type' in agent_dict:
+                                    del agent_dict['_type']
+                    return original_crew_init(self, **kwargs)
+                
+                Crew.__init__ = patched_crew_init
+            except ImportError:
+                pass
+            
+        except ImportError:
+            pass  # CrewAI Settings not available
+        
+        print("✅ Enhanced ChromaDB and CrewAI configuration patched for tests")
         
     except ImportError:
         print("⚠️  ChromaDB not available for patching")
@@ -65,8 +109,8 @@ def setup_test_environment():
     if "DISABLE_CREW_MEMORY" not in os.environ:
         os.environ["DISABLE_CREW_MEMORY"] = "true"
     
-    # Apply ChromaDB patches to prevent _type KeyError
-    patch_chromadb_config()
+    # Apply enhanced patches to prevent infrastructure issues
+    enhanced_chromadb_config_patch()
     
     yield temp_dir
     
@@ -128,49 +172,27 @@ def mock_llm():
 
 @pytest.fixture
 def llm_config():
-    """LLM configuration for testing."""
-    return {
-        'provider': 'anthropic',
-        'model': 'anthropic/claude-3-haiku-20240307',
-        'api_key': 'test-anthropic-key'
-    }
+    """LLM configuration for testing - derived from .env."""
+    from server_research_mcp.config.llm_config import get_llm_config
+    return get_llm_config()
 
 @pytest.fixture
 def llm_instance(llm_config):
-    """Mock LLM instance for testing."""
-    from unittest.mock import MagicMock
-    mock_llm = MagicMock()
+    """Real LLM instance for testing - uses .env configuration."""
+    from server_research_mcp.config.llm_config import get_configured_llm
     
-    def mock_call(messages):
-        if isinstance(messages, str):
-            if "successful" in messages.lower():
-                return "LLM test successful"
-            elif "hello" in messages.lower():
-                return "Hello from test"
-            elif "42" in messages:
-                return "The number is 42"
-            elif "2+2" in messages:
-                return "4"
-            elif "world" in messages.lower():
-                return "Hello, world"
-            elif "yes or no" in messages.lower():
-                return "yes"
-            else:
-                return "Mock LLM response"
-        elif isinstance(messages, list):
-            last_message = messages[-1].get('content', '') if messages else ''
-            if "42" in last_message:
-                return "The number you asked me to remember is 42"
-            elif "successful" in last_message.lower():
-                return "LLM test successful"
-            else:
-                return "Mock conversation response"
-        return "Mock LLM response"
-    
-    mock_llm.call = mock_call
-    mock_llm.model = llm_config['model']
-    mock_llm.api_key = llm_config['api_key']
-    return mock_llm
+    try:
+        # Use the real LLM configuration from .env
+        llm = get_configured_llm()
+        return llm
+    except Exception as e:
+        # If real LLM fails, provide a basic mock for structure tests
+        from unittest.mock import MagicMock
+        mock_llm = MagicMock()
+        mock_llm.model = llm_config.get('model', 'test/model')
+        mock_llm.api_key = llm_config.get('api_key', 'test-key')
+        mock_llm.call.return_value = "Test response from fallback mock"
+        return mock_llm
 
 @pytest.fixture
 def mock_crew():
@@ -978,3 +1000,32 @@ def valid_report_output():
     
     Emerging trends in AI testing include the integration of continuous validation pipelines, advanced adversarial testing techniques, and real-time performance monitoring systems that adapt to changing operational conditions.
     """ 
+
+# Add after existing fixtures, before the end of file
+TOOL_EXPECTATIONS = {
+    "historian": {
+        "min_tools": 4,
+        "expected_keywords": ["memory", "search_nodes", "create_entities", "read_graph"],
+        "server_type": "memory"
+    },
+    "researcher": {
+        "min_tools": 3,  
+        "expected_keywords": ["zotero", "search_items", "item_metadata"],
+        "server_type": "zotero"
+    },
+    "archivist": {
+        "min_tools": 1,
+        "expected_keywords": ["sequential", "thinking"],
+        "server_type": "sequential_thinking"
+    },
+    "publisher": {
+        "min_tools": 10,  # Filesystem tools vary by server setup
+        "expected_keywords": ["read_file", "write_file", "list_directory"],
+        "server_type": "filesystem"
+    }
+}
+
+@pytest.fixture
+def tool_expectations():
+    """Shared tool expectations to eliminate duplication across test files."""
+    return TOOL_EXPECTATIONS 

@@ -10,43 +10,87 @@ load_dotenv()
 
 
 class LLMConfig:
-    """Centralized LLM configuration management."""
+    """Centralized LLM configuration management - entirely environment-driven."""
     
     def __init__(self):
-        self.provider = os.getenv('LLM_PROVIDER', 'anthropic').lower()
+        self.provider = None
         self.model = None
         self.api_key = None
         self._configure()
     
     def _configure(self):
-        """Configure LLM based on provider."""
+        """Configure LLM based purely on environment variables."""
+        # Provider must be explicitly set in environment
+        self.provider = os.getenv('LLM_PROVIDER')
+        if not self.provider:
+            raise ValueError("LLM_PROVIDER environment variable is required. Set to 'anthropic', 'openai', or other supported provider")
+        
+        self.provider = self.provider.lower()
+        
+        # Model must be explicitly set in environment
+        self.model = os.getenv('LLM_MODEL')
+        if not self.model:
+            raise ValueError("LLM_MODEL environment variable is required. Examples: 'claude-3-haiku-20240307', 'gpt-4o-mini', etc.")
+        
+        # API key must be explicitly set in environment
         if self.provider == 'anthropic':
             self.api_key = os.getenv('ANTHROPIC_API_KEY')
             if not self.api_key:
                 raise ValueError("ANTHROPIC_API_KEY environment variable is required when using Anthropic provider")
-            self.model = os.getenv('LLM_MODEL', 'claude-3-haiku-20240307')
-            
         elif self.provider == 'openai':
             self.api_key = os.getenv('OPENAI_API_KEY')
             if not self.api_key:
                 raise ValueError("OPENAI_API_KEY environment variable is required when using OpenAI provider")
-            self.model = os.getenv('LLM_MODEL', 'gpt-4o-mini')
-            
         else:
-            raise ValueError(f"Unsupported LLM provider: {self.provider}. Use 'anthropic' or 'openai'")
+            # For other providers, use generic LLM_API_KEY
+            self.api_key = os.getenv('LLM_API_KEY')
+            if not self.api_key:
+                raise ValueError(f"LLM_API_KEY environment variable is required for provider '{self.provider}'")
     
     def get_llm(self) -> LLM:
-        """Get configured LLM instance."""
+        """Get configured LLM instance with all settings from environment."""
+        # All timeout and retry settings must come from environment
+        timeout = os.getenv('LLM_REQUEST_TIMEOUT')
+        if timeout is None:
+            raise ValueError("LLM_REQUEST_TIMEOUT environment variable is required")
+        
+        max_retries = os.getenv('LLM_MAX_RETRIES')
+        if max_retries is None:
+            raise ValueError("LLM_MAX_RETRIES environment variable is required")
+        
+        streaming = os.getenv('LLM_STREAMING')
+        if streaming is None:
+            raise ValueError("LLM_STREAMING environment variable is required (set to 'true' or 'false')")
+        
         return LLM(
             model=f"{self.provider}/{self.model}",
-            api_key=self.api_key
+            api_key=self.api_key,
+            timeout=int(timeout),
+            max_retries=int(max_retries),
+            streaming=streaming.lower() == 'true'
         )
     
     def check_configuration(self) -> tuple[bool, Optional[str]]:
         """Check if LLM is properly configured."""
         try:
-            if not self.api_key:
-                return False, f"{self.provider.upper()}_API_KEY not found"
+            required_vars = ['LLM_PROVIDER', 'LLM_MODEL', 'LLM_REQUEST_TIMEOUT', 'LLM_MAX_RETRIES', 'LLM_STREAMING']
+            missing_vars = []
+            
+            for var in required_vars:
+                if not os.getenv(var):
+                    missing_vars.append(var)
+            
+            # Check provider-specific API key
+            if self.provider == 'anthropic' and not os.getenv('ANTHROPIC_API_KEY'):
+                missing_vars.append('ANTHROPIC_API_KEY')
+            elif self.provider == 'openai' and not os.getenv('OPENAI_API_KEY'):
+                missing_vars.append('OPENAI_API_KEY')
+            elif self.provider not in ['anthropic', 'openai'] and not os.getenv('LLM_API_KEY'):
+                missing_vars.append('LLM_API_KEY')
+            
+            if missing_vars:
+                return False, f"Missing required environment variables: {', '.join(missing_vars)}"
+            
             return True, None
         except Exception as e:
             return False, str(e)

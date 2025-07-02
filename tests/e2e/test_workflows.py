@@ -507,7 +507,7 @@ class TestErrorRecovery:
 class TestEndToEndResearchFlow:
     """Test complete research workflow from input to output (legacy compatibility)."""
     
-    @patch('builtins.input', side_effect=['Artificial Intelligence Ethics', 'y'])
+    @patch('builtins.input', side_effect=['Artificial Intelligence Ethics', 'y', StopIteration])
     @patch('src.server_research_mcp.crew.ServerResearchMcp.crew')
     @patch('sys.argv', ['main.py', 'test query', '--yes'])  # Add --yes flag to skip confirmation
     def test_complete_research_workflow(self, mock_crew_method, mock_input, 

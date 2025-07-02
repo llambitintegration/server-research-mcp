@@ -528,19 +528,31 @@ def get_archivist_tools() -> List[BaseTool]:
 
 
 def get_publisher_tools() -> List[BaseTool]:
-    """Obsidian/publishing tools with filesystem fallback"""
+    """Filesystem/publishing tools for content creation and management"""
+    # Updated keywords to match actual MCP filesystem server tool names
     publish_keywords = [
-        'obsidian', 'note', 'vault', 'markdown', 'publish', 'create_note',
-        'write_file', 'read_file', 'create_directory', 'list_directory', 'write_text_file'
+        'file', 'directory', 'write', 'read', 'edit', 'create', 'list', 'move', 'search', 'info', 'tree'
     ]
     filtered_tools = _filter_tools(publish_keywords)
     
-    # Always ensure we have basic publishing capability
-    if not filtered_tools:
-        logger.warning("⚠️ No MCP publishing tools available, adding basic tools")
-        filtered_tools = BASIC_TOOLS
+    # Filter to only filesystem tools (exclude memory/other tools that also match)
+    filesystem_tools = []
+    for tool in filtered_tools:
+        tool_name = getattr(tool, 'name', '').lower()
+        # Include tools that are clearly filesystem operations
+        if any(fs_term in tool_name for fs_term in [
+            'file', 'directory', 'write_file', 'read_file', 'edit_file', 
+            'create_directory', 'list_directory', 'move_file', 'search_files',
+            'get_file_info', 'directory_tree', 'list_allowed_directories'
+        ]):
+            filesystem_tools.append(tool)
     
-    return filtered_tools
+    # Always ensure we have basic publishing capability
+    if not filesystem_tools:
+        logger.warning("⚠️ No MCP filesystem tools available for publisher")
+        filesystem_tools = BASIC_TOOLS
+    
+    return filesystem_tools
 
 
 def get_context7_tools() -> List[BaseTool]:
@@ -698,8 +710,20 @@ class _AsyncWorker:
 
 def _patch_tool(tool: BaseTool) -> BaseTool:
     """Ensure the BaseTool's synchronous interface uses background loop."""
-    # Preserve args_schema before patching
-    original_args_schema = getattr(tool, 'args_schema', None)
+    # Preserve args_schema before patching - check multiple sources
+    original_args_schema = None
+    
+    # Try direct attribute first
+    if hasattr(tool, 'args_schema'):
+        candidate = getattr(tool, 'args_schema', None)
+        if candidate is not None:
+            original_args_schema = candidate
+    
+    # Try class attribute if direct didn't work
+    if original_args_schema is None and hasattr(tool.__class__, 'args_schema'):
+        candidate = getattr(tool.__class__, 'args_schema', None)
+        if candidate is not None:
+            original_args_schema = candidate
     
     # Check if tool has async methods that need patching
     if hasattr(tool, "_arun") and callable(getattr(tool, "_arun")):
@@ -734,9 +758,11 @@ def _patch_tool(tool: BaseTool) -> BaseTool:
                 
                 setattr(tool, attr_name, make_sync_wrapper(async_method))
     
-    # Restore args_schema after patching
+    # Restore args_schema after patching - ensure it's properly set
     if original_args_schema is not None:
         tool.args_schema = original_args_schema
+        # Also set it as instance attribute to ensure accessibility
+        setattr(tool, 'args_schema', original_args_schema)
     
     return tool
 
@@ -746,23 +772,62 @@ def _patch_tool(tool: BaseTool) -> BaseTool:
 
 class MCPToolWrapper(BaseTool):
     """Wrapper for MCP tools with enhanced error handling and schema propagation."""
-    original_tool: Any  # Declare the field for Pydantic
-    args_schema: Type[BaseModel]  # Expose schema as class attribute
+    
+    # Declare custom fields for Pydantic compatibility
+    original_tool: Any = None
     
     def __init__(self, original_tool: BaseTool):
         # Extract name and description before calling super
         name = getattr(original_tool, 'name', 'unknown_tool')
         description = getattr(original_tool, 'description', 'MCP tool')
         
-        # Step 1a: Read original_tool.args_schema if it exists
-        if hasattr(original_tool, 'args_schema') and original_tool.args_schema is not None:
-            args_schema = original_tool.args_schema
-        else:
-            # Step 1b: Build Pydantic model from _run signature
-            args_schema = self._build_schema_from_run_signature(original_tool)
+        logger.debug(f"🔧 MCPToolWrapper initializing for {name}")
         
-        # Initialize parent with required fields
-        super().__init__(name=name, description=description, original_tool=original_tool, args_schema=args_schema)
+        # Step 1a: Read original_tool.args_schema if it exists
+        # Check multiple ways to access the schema
+        args_schema = None
+        
+        # Method 1: Direct attribute access
+        if hasattr(original_tool, 'args_schema'):
+            candidate_schema = getattr(original_tool, 'args_schema', None)
+            if candidate_schema is not None:
+                args_schema = candidate_schema
+                logger.debug(f"🔧 {name}: Using original tool's args_schema (direct)")
+        
+        # Method 2: Check class attribute
+        if args_schema is None and hasattr(original_tool.__class__, 'args_schema'):
+            candidate_schema = getattr(original_tool.__class__, 'args_schema', None)
+            if candidate_schema is not None:
+                args_schema = candidate_schema
+                logger.debug(f"🔧 {name}: Using original tool's args_schema (class)")
+        
+        # Step 1b: Build Pydantic model from _run signature only if no schema found
+        if args_schema is None:
+            try:
+                args_schema = self._build_schema_from_run_signature(original_tool)
+                logger.debug(f"🔧 {name}: Built args_schema from signature")
+            except Exception as e:
+                logger.error(f"🔧 {name}: Failed to build schema from signature: {e}")
+                # Create minimal schema as fallback
+                args_schema = create_model(f"{name}Schema", 
+                                         query=(str, Field(default=None, description="Query parameter")))
+        
+        logger.debug(f"🔧 {name}: Calling super().__init__ with name={name}, description={description[:50]}...")
+        
+        try:
+            # Initialize parent with all parameters including custom ones
+            super().__init__(
+                name=name, 
+                description=description, 
+                original_tool=original_tool,
+                args_schema=args_schema
+            )
+            logger.debug(f"🔧 {name}: super().__init__ completed successfully")
+        except Exception as e:
+            logger.error(f"🔧 {name}: super().__init__ failed: {e}")
+            raise
+        
+        logger.debug(f"🔧 {name}: MCPToolWrapper initialization completed")
     
     def _build_schema_from_run_signature(self, tool: BaseTool) -> Type[BaseModel]:
         """Build a Pydantic model from the tool's _run method signature."""
@@ -858,18 +923,43 @@ class MCPToolWrapper(BaseTool):
             # Step 2: Handle legacy positional arg calls by converting first string arg to kwargs
             # This preserves backward compatibility while enforcing kwargs-only interface
             if len(kwargs) == 1 and list(kwargs.keys())[0] not in ['query', 'properties']:
-                # Check if the value looks like a JSON string
                 first_key = list(kwargs.keys())[0]
                 first_value = kwargs[first_key]
-                if isinstance(first_value, str):
+                
+                # Only convert to query if the key suggests it's a positional argument
+                # Don't convert legitimate named parameters like 'path', 'limit', etc.
+                legitimate_params = ['path', 'limit', 'count', 'size', 'max_results', 'num_results', 
+                                   'qmode', 'tag', 'filename', 'directory', 'content', 'data']
+                
+                if first_key not in legitimate_params and isinstance(first_value, str):
                     try:
                         parsed = json.loads(first_value)
                         if isinstance(parsed, dict):
                             logger.info(f"🔧 {self.name} - Converting JSON string to kwargs: {parsed}")
                             kwargs = parsed
                     except json.JSONDecodeError:
-                        # Not JSON, treat as query parameter
+                        # Not JSON and not a legitimate parameter name, treat as query parameter
+                        logger.info(f"🔧 {self.name} - Converting unknown parameter '{first_key}' to query")
                         kwargs = {'query': first_value}
+
+            # Step 3: Type coercion for common parameter mismatches
+            # Handle cases where integers are expected but strings are provided
+            if 'limit' in kwargs and isinstance(kwargs['limit'], str):
+                try:
+                    kwargs['limit'] = int(kwargs['limit'])
+                    logger.info(f"🔧 {self.name} - Coerced 'limit' from string to int: {kwargs['limit']}")
+                except ValueError:
+                    # If conversion fails, let original validation handle it
+                    pass
+            
+            # Handle other common integer parameters
+            for int_param in ['count', 'size', 'max_results', 'num_results']:
+                if int_param in kwargs and isinstance(kwargs[int_param], str):
+                    try:
+                        kwargs[int_param] = int(kwargs[int_param])
+                        logger.info(f"🔧 {self.name} - Coerced '{int_param}' from string to int: {kwargs[int_param]}")
+                    except ValueError:
+                        pass
 
             # After preprocessing, log the final payload in debug mode
             logger.info(f"🔧 {self.name} AFTER PROCESSING - kwargs={kwargs}")
