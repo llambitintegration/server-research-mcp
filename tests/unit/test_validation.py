@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from server_research_mcp.crew import validate_research_output, validate_report_output
+from server_research_mcp.utils.validators import validate_research_output, validate_report_output, count_bullet_points, count_markdown_headers
 from server_research_mcp.main import get_user_input
 
 
@@ -246,13 +246,7 @@ class TestValidationHelpers:
         ]
         
         for text, expected_count in test_cases:
-            # This simulates the counting logic used in validation (matches crew.py logic)
-            bullet_patterns = ['-', '*', '•']
-            count = 0
-            for line in text.split('\n'):
-                stripped = line.strip()
-                if any(stripped.startswith(pattern + ' ') for pattern in bullet_patterns):
-                    count += 1
+            count = count_bullet_points(text)
             assert count == expected_count
             
     def test_markdown_header_counting(self):
@@ -265,10 +259,5 @@ class TestValidationHelpers:
         ]
         
         for text, expected_count in test_cases:
-            # This simulates the header counting logic used in validation
-            header_count = 0
-            for line in text.split('\n'):
-                stripped = line.strip()
-                if stripped.startswith('#') and ' ' in stripped:
-                    header_count += 1
-            assert header_count == expected_count
+            count = count_markdown_headers(text)
+            assert count == expected_count

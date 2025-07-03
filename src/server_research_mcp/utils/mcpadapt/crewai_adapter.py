@@ -87,15 +87,30 @@ def create_positional_model_from_json_schema(
 
 
 def _get_python_type_from_property(prop_info: dict) -> Type:
-    """Extract Python type from JSON schema property info."""
-    prop_type = prop_info.get("type", "string")
-    
-    if isinstance(prop_type, list):
-        # Handle union types (e.g., ["string", "null"])
-        types = [json_type_mapping.get(t, str) for t in prop_type if t != "null"]
-        return types[0] if len(types) == 1 else str  # Simplified for now
-    
-    return json_type_mapping.get(prop_type, str)
+    """
+    Map a JSON-schema property to a Python type.
+    Handles  ✦ type                        ─ "string" / "integer" / …
+             ✦ union types in a list       ─ ["integer","null"]
+             ✦ anyOf / oneOf constructs    ─ anyOf:[{type:int},{type:null}]
+    Falls back to typing.Any if the combination is too complex.
+    """
+    # 1. simple  "type": "integer"
+    if "type" in prop_info:
+        t = prop_info["type"]
+        if isinstance(t, list):
+            # choose the first non-null entry
+            t = next((x for x in t if x != "null"), "string")
+        return json_type_mapping.get(t, Any)
+
+    # 2. complex schema – look at anyOf / oneOf
+    for key in ("anyOf", "oneOf", "allOf"):
+        if key in prop_info and isinstance(prop_info[key], list):
+            for option in prop_info[key]:
+                if "type" in option and option["type"] != "null":
+                    return json_type_mapping.get(option["type"], Any)
+
+    # 3. default fallback
+    return Any
 
 
 class CrewAIAdapter(ToolAdapter):
@@ -174,7 +189,40 @@ class CrewAIAdapter(ToolAdapter):
                             filtered_kwargs[key] = value
                     
                     # CRITICAL FIX: Validate required parameters are present and not empty
+                    # Before validation, check if we have JSON strings that might contain the required parameters
                     missing_required = []
+                    
+                    # First, try to parse any JSON strings in args or kwargs that might contain required parameters
+                    potential_json_sources = []
+                    
+                    # Check positional args for JSON strings
+                    if args:
+                        for arg in args:
+                            if isinstance(arg, str) and arg.strip().startswith('{'):
+                                potential_json_sources.append(arg)
+                    
+                    # Check kwargs values for JSON strings
+                    for key, value in filtered_kwargs.items():
+                        if isinstance(value, str) and value.strip().startswith('{'):
+                            potential_json_sources.append(value)
+                    
+                    # Try to parse JSON sources and merge them into filtered_kwargs
+                    parsed_params = {}
+                    for json_str in potential_json_sources:
+                        try:
+                            import json
+                            parsed_data = json.loads(json_str)
+                            if isinstance(parsed_data, dict):
+                                parsed_params.update(parsed_data)
+                        except (json.JSONDecodeError, TypeError):
+                            continue
+                    
+                    # Merge parsed parameters (but don't override existing direct parameters)
+                    for key, value in parsed_params.items():
+                        if key not in filtered_kwargs:
+                            filtered_kwargs[key] = value
+                    
+                    # Now validate required parameters
                     for required_prop in required_props:
                         if required_prop not in filtered_kwargs:
                             missing_required.append(required_prop)

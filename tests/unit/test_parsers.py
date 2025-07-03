@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
 # Import components to test
-from server_research_mcp.crew import ServerResearchMcp
+from server_research_mcp.crew import ServerResearchMcpCrew
 from server_research_mcp.schemas import (
     EnrichedQuery,
     RawPaperData,
@@ -181,7 +181,8 @@ class TestParserValidation:
             result_dict = json.loads(error) if isinstance(error, str) else error
             assert "original_query" in result_dict
         else:
-            assert "Missing required fields" in error
+            # Check for Pydantic validation error patterns
+            assert "Field required" in error or "Validation error" in error
     
     def test_raw_paper_data_validation(self):
         """Test raw paper data validation."""

@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, call
-from server_research_mcp.crew import ServerResearchMcp
+from server_research_mcp.crew import ServerResearchMcpCrew
 from crewai import Agent
 import asyncio
 
@@ -12,8 +12,8 @@ class TestAgentEcosystem:
     
     def test_crew_agent_initialization(self, disable_crew_memory, mock_llm):
         """Test all agents initialize properly with correct tools."""
-        with patch('server_research_mcp.crew.get_configured_llm', return_value=mock_llm):
-            crew_instance = ServerResearchMcp()
+        with patch('server_research_mcp.config.llm_config.get_configured_llm', return_value=mock_llm):
+            crew_instance = ServerResearchMcpCrew()
             crew = crew_instance.crew()
             
             # Verify basic structure
@@ -88,7 +88,7 @@ class TestAgentEcosystem:
     def test_agent_llm_consistency(self, mock_llm):
         """Test all agents use consistent LLM configuration."""
         with patch('server_research_mcp.config.llm_config.create_llm', return_value=mock_llm):
-            crew_instance = ServerResearchMcp()
+            crew_instance = ServerResearchMcpCrew()
             
             researcher = crew_instance.researcher()
             analyst = crew_instance.reporting_analyst()
@@ -122,7 +122,7 @@ class TestAgentEcosystem:
 
     def test_task_agent_assignment(self, disable_crew_memory):
         """Test tasks are properly assigned to agents."""
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         crew = crew_instance.crew()
         
         # Each task should have an assigned agent
@@ -217,7 +217,7 @@ class TestAgentPerformance:
         import time
         
         start_time = time.time()
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         crew = crew_instance.crew()
         initialization_time = time.time() - start_time
         
@@ -270,7 +270,7 @@ class TestAgentIntegration:
 
     def test_agent_guardrail_integration(self, disable_crew_memory):
         """Test agent guardrails are properly integrated."""
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         
         # Test research task guardrails
         research_task = crew_instance.research_task()
@@ -286,7 +286,7 @@ class TestAgentIntegration:
 
     def test_human_input_configuration(self, disable_crew_memory):
         """Test human input is properly configured for automated testing."""
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         
         # Context gathering should not require human input in tests
         context_task = crew_instance.context_gathering_task()

@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, call
-from server_research_mcp.crew import ServerResearchMcp
+from server_research_mcp.crew import ServerResearchMcpCrew
 from crewai import Process
 import json
 import os
@@ -13,7 +13,7 @@ class TestCrewInitialization:
     
     def test_crew_basic_initialization(self, test_environment):
         """Test basic crew initialization."""
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         assert crew_instance is not None
         
     def test_crew_with_custom_config(self, test_environment, mock_llm, mock_chromadb_config):
@@ -24,9 +24,9 @@ class TestCrewInitialization:
         os.environ["DISABLE_CREW_MEMORY"] = "false"
         
         try:
-            with patch('server_research_mcp.crew.get_configured_llm', return_value=mock_llm):
+            with patch('server_research_mcp.config.llm_config.get_configured_llm', return_value=mock_llm):
                 with patch('chromadb.config.Settings', return_value=mock_chromadb_config):
-                    crew_instance = ServerResearchMcp()
+                    crew_instance = ServerResearchMcpCrew()
                     crew = crew_instance.crew()
                     
                     assert crew.process == Process.sequential

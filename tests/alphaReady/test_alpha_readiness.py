@@ -20,7 +20,7 @@ import asyncio
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from server_research_mcp.crew import ServerResearchMcp
+from server_research_mcp.crew import ServerResearchMcpCrew
 from server_research_mcp.main import parse_arguments, validate_environment, run_crew
 
 
@@ -69,7 +69,7 @@ class TestAlphaReadiness:
     def test_critical_crew_initialization(self, alpha_test_environment):
         """CRITICAL: Crew must initialize without errors using MCPAdapt system."""
         # Test crew creation with MCPAdapt system
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         assert crew_instance is not None
         
         # Test crew assembly
@@ -86,7 +86,7 @@ class TestAlphaReadiness:
     
     def test_critical_crew_configuration(self, alpha_test_environment):
         """CRITICAL: Crew configuration must be correct for alpha."""
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         crew = crew_instance.crew()
         
         # Verify crew is properly configured for execution
@@ -131,7 +131,8 @@ class TestAlphaReadiness:
         valid_paper = json.dumps({
             "metadata": {"title": "Test", "authors": ["Author"]},
             "full_text": "Content",
-            "sections": [],
+            "sections": {"Introduction": "Intro content", "Methods": "Methods content"},
+            "extraction_method": "automated",
             "extraction_quality": 0.8
         })
         is_valid, result = validate_raw_paper_data(valid_paper)
@@ -259,7 +260,7 @@ class TestAlphaPerformance:
         import time
         
         start_time = time.time()
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         crew = crew_instance.crew()
         initialization_time = time.time() - start_time
         

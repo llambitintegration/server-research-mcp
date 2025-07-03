@@ -3,7 +3,7 @@
 import pytest
 import asyncio
 from unittest.mock import MagicMock, patch
-from server_research_mcp.crew import ServerResearchMcp
+from server_research_mcp.crew import ServerResearchMcpCrew
 from crewai import Crew, Agent, Task
 import json
 from crewai.tools import BaseTool
@@ -175,7 +175,7 @@ class TestMCPAgentIntegration:
     def test_agent_mcp_tool_assignment(self, disable_crew_memory, mock_mcp_manager):
         """Test agents receive MCP tools correctly."""
         with patch('server_research_mcp.tools.mcp_tools.get_mcp_manager', return_value=mock_mcp_manager):
-            crew_instance = ServerResearchMcp()
+            crew_instance = ServerResearchMcpCrew()
             
             # Test researcher agent gets research tools
             researcher = crew_instance.researcher()
@@ -190,7 +190,7 @@ class TestMCPAgentIntegration:
     def test_crew_mcp_workflow_simulation(self, disable_crew_memory, mock_mcp_manager):
         """Test crew workflow with MCP tools (no actual execution)."""
         with patch('server_research_mcp.tools.mcp_tools.get_mcp_manager', return_value=mock_mcp_manager):
-            crew_instance = ServerResearchMcp()
+            crew_instance = ServerResearchMcpCrew()
             crew = crew_instance.crew()
             
             # Verify crew structure

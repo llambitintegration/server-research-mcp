@@ -518,7 +518,7 @@ class TestErrorRecovery:
 class TestEndToEndResearchFlow:
     """Test complete research workflow from input to output (legacy compatibility)."""
     
-    @patch('server_research_mcp.crew.ServerResearchMcp.crew')
+    @patch('server_research_mcp.crew.ServerResearchMcpCrew.crew')
     def test_complete_research_workflow(self, mock_crew_method, 
                                       valid_research_output, valid_report_output):
         """Test complete workflow from user input to final report."""

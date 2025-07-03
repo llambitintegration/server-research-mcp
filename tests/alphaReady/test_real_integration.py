@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 # from server_research_mcp.tools.mcp_manager import MCPManager, get_mcp_manager
 # from server_research_mcp.tools.enhanced_mcp_manager import EnhancedMCPManager, get_enhanced_mcp_manager
 from server_research_mcp.utils.mcpadapt import MCPAdapt, CrewAIAdapter
-from server_research_mcp.crew import ServerResearchMcp
+from server_research_mcp.crew import ServerResearchMcpCrew
 from server_research_mcp.main import run_crew
 
 
@@ -226,7 +226,7 @@ class TestRealWorkflows:
         os.environ["DISABLE_CREW_MEMORY"] = "true"
         
         try:
-            crew_instance = ServerResearchMcp()
+            crew_instance = ServerResearchMcpCrew()
             crew = crew_instance.crew()
             
             assert crew is not None

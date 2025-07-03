@@ -1,163 +1,97 @@
+# Task Configuration for Server Research MCP Crew
+# Enhanced with structured output specifications
+
 context_gathering_task:
   description: >
-    CRITICAL: Avoid hallucination. Only work with existing memory data or minimal factual input.
-    
-    Memory context gathering for: {paper_query}
-
-    STRICT workflow:
-    1. Search memory for semantic matches to {paper_query}
-    2. IF MEMORY CONTAINS RELEVANT CONTEXT:
-       - Retrieve existing entities and relations
-       - Provide factual context to crew
-       - NO new memory writes beyond search logging
-    3. IF NO MEMORY CONTEXT EXISTS:
-       - Set temperature to zero
-       - Input ONLY the user query as a basic entity
-       - NO additional relations, observations, or expanded content
-       - NO hallucinated context or recommendations
-       - Provide the query to the crew
-    
-    Current year: {current_year}
-    
-    REMEMBER: Minimal memory writes, maximum factual accuracy.
-    
-    OUTPUT CRITICAL: Structure your response as valid JSON with these exact fields:
-    - original_query: The unmodified paper query
-    - expanded_terms: List of search terms (from memory or original query words)
-    - search_strategy: Recommended search approach
-    - historical_context: Any relevant memory context found
-    - memory_entities: List of created/referenced memory entities
+    Gather and enrich context for the research query: {topic}.
+    Search existing knowledge base for related papers, authors, and topic context.
+    Expand search terms and develop a comprehensive search strategy.
+    Create memory entities for new information discovered.
   expected_output: >
-    A factual context object containing ONLY verified information structured as JSON:
-    {
-      "original_query": "exact paper query provided",
-      "expanded_terms": ["term1", "term2", "term3"],
-      "search_strategy": "comprehensive search strategy",
-      "historical_context": [],
-      "memory_entities": ["entity1", "entity2"]
-    }
-    
-    This JSON will be used by the Researcher agent to perform paper extraction.
-    NO additional text, only the JSON structure.
+    A structured enriched query object containing:
+    - Original query and expanded search terms
+    - Related papers from memory with titles and relevance
+    - Known authors in the field with their affiliations
+    - Topic context and domain knowledge
+    - Recommended search strategy
+    - Memory entities created or updated
   agent: historian
-  human_input: false
+  # Enable structured output with schema validation
+  output_json_schema: "EnrichedQuery"
 
 paper_extraction_task:
   description: >
-    Extract comprehensive paper content using enriched context from Historian.
-    
-    CONTEXT RECEIVED: You will receive enriched query context from the Historian agent.
-    Use this context to guide your paper extraction strategy.
-    
-    Original query: {paper_query}
-    Enriched context: Use the previous task's output for search strategy and expanded terms
-    Current year: {current_year}
-
-    STRICT WORKFLOW:
-    1. Parse the enriched context from the previous task (Historian)
-    2. Use zotero-mcp to search for the paper using the enriched search strategy
-    3. Extract all metadata including title, authors, year, DOI, journal, etc.
-    4. Extract main content sections:
-       - Abstract
-       - Introduction
-       - Methodology
-       - Results
-       - Discussion
-       - Conclusion
-       - References
-    5. Identify figures, tables, and equations with their captions
-    6. Extract highlights, annotations, and notes if available
-    
-    TOOL RESTRICTIONS: 
-    - Use ONLY Zotero tools
-    - DO NOT use memory tools (search_nodes, create_entities, etc.)
-    - If you need historical context, refer to the Historian's output
-    
-    Ensure comprehensive extraction while maintaining structure integrity.
+    Search for and extract comprehensive data about: {topic}.
+    Use Zotero tools to find relevant academic papers.
+    Extract full metadata, abstracts, and full-text content when available.
+    Include paper sections, references, and any annotations.
+    Assess extraction quality and completeness.
   expected_output: >
-    A raw paper object containing:
-    - Complete metadata (title, authors, year, journal, DOI, etc.)
-    - Full text content organized by sections
-    - References list with parsed citations
-    - Figures and tables information
-    - Any annotations or highlights
+    Raw paper data including:
+    - Complete metadata (title, authors, journal, DOI, etc.)
+    - Full-text content with section organization
+    - Reference list and citation information
+    - Figures and tables metadata
     - Extraction quality metrics
-    - Reference to the enriched context used
-    
-    The output MUST include (but is not limited to) the following fields:
-    - Thought:
-    - Action:
-    - Action Input:
+    - Zotero item key for reference
   agent: researcher
+  # Enable structured output with schema validation
+  output_json_schema: "RawPaperData"
 
-data_structuring_task:
+analysis_and_structuring_task:
   description: >
-    Transform raw paper data into validated JSON schema format: {raw_paper_data}
-    
-    Your workflow should be:
-    1. Apply the research paper JSON schema to structure the raw data
-    2. Use sequential-thinking for intelligent summarization of each section
-    3. Validate all required fields are present and properly formatted
-    4. Generate intelligent summaries that preserve key insights
-    5. Create structured data for:
-       - Paper metadata with proper typing
-       - Section summaries with key points
-       - Author information with affiliations
-       - Citation network data
-       - Keywords and topics extraction
-       - Key findings and contributions
-    6. Ensure Obsidian compatibility for all text fields
-    7. Add quality scores and validation status
-    
-    Maintain high fidelity while ensuring schema compliance.
+    Analyze and structure the raw paper data from the previous task.
+    Use sequential thinking to break down the content systematically.
+    Extract key findings, contributions, and limitations.
+    Structure the information according to academic paper standards.
+    Validate against the research paper schema.
   expected_output: >
-    A validated JSON object conforming to research paper schema containing:
-    - Fully validated metadata section
-    - Structured content with intelligent summaries
-    - Author and affiliation data
-    - Citation and reference data
-    - Keywords and topic classifications
-    - Key findings and contributions
-    - Validation status and quality metrics
-    Formatted as valid JSON matching the schema
+    A fully structured research paper object with:
+    - Validated metadata with proper author objects
+    - Organized sections with summaries and key points
+    - Processed references with citation analysis
+    - Extracted key findings and contributions
+    - Identified limitations and future work suggestions
+    - Quality metrics and validation status
   agent: archivist
+  # Enable structured output with schema validation
+  output_json_schema: "ResearchPaperSchema"
 
-markdown_generation_task:
+publishing_task:
   description: >
-    Convert structured JSON to Obsidian markdown and integrate into vault: {structured_json}
-    
-    Your workflow should be:
-    1. Transform JSON structure to markdown using Obsidian conventions
-    2. Generate comprehensive YAML frontmatter including:
-       - Title, authors, year, journal
-       - Tags based on keywords and topics
-       - Aliases for alternative references
-       - Custom metadata fields
-    3. Create markdown sections with proper hierarchy:
-       - Summary section with key insights
-       - Detailed sections for each paper component
-       - Properly formatted citations and references
-       - Tables and figure references
-    4. Generate knowledge graph connections:
-       - Wiki-links to related papers
-       - Author pages connections
-       - Topic and concept links
-       - Citation network visualization
-    5. Use obsidian-mcp-tools to:
-       - Save to appropriate vault location
-       - Update index files
-       - Create necessary folders
-    6. Ensure beautiful formatting with modern Obsidian features
-    
-    Create a document that enhances the knowledge graph.
+    Generate publication-ready documents from the structured paper data.
+    Create both Obsidian markdown with frontmatter and standalone markdown.
+    Use filesystem tools to write files to the Obsidian vault.
+    Generate proper cross-references and knowledge graph connections.
+    Include metadata for vault integration and discoverability.
   expected_output: >
-    A completed Obsidian markdown document containing:
-    - Rich YAML frontmatter with all metadata
-    - Well-structured markdown content
-    - Extensive wiki-links and connections
-    - Properly formatted references
-    - Knowledge graph integration
-    - File saved to vault with confirmation
-    - Path to created document
-    Formatted as Obsidian markdown saved to vault
+    Published documents including:
+    - Obsidian markdown file with structured frontmatter
+    - Standalone markdown with academic formatting
+    - Knowledge graph connections and backlinks
+    - File paths and vault integration status
+    - Publishing metadata and timestamps
   agent: publisher
+  # Enable structured output with schema validation
+  output_json_schema: "ObsidianDocument"
+
+# Additional configuration for schema validation
+schema_validation:
+  strict_mode: false  # Allow minor deviations for flexibility
+  retry_on_failure: true
+  max_retries: 2
+  provide_feedback: true
+
+output_formats:
+  EnrichedQuery:
+    model: "server_research_mcp.schemas.research_paper.EnrichedQuery"
+    validation_level: "medium"
+  RawPaperData:
+    model: "server_research_mcp.schemas.research_paper.RawPaperData"
+    validation_level: "medium" 
+  ResearchPaperSchema:
+    model: "server_research_mcp.schemas.research_paper.ResearchPaperSchema"
+    validation_level: "high"
+  ObsidianDocument:
+    model: "server_research_mcp.schemas.obsidian_meta.ObsidianDocument"
+    validation_level: "high"

@@ -11,13 +11,13 @@ except AttributeError:
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-from .crew import ServerResearchMcp
+from .crew import ServerResearchMcpCrew
 from .main import run, train, replay, test
 
 __version__ = "0.1.0"
 
 __all__ = [
-    'ServerResearchMcp',
+    'ServerResearchMcpCrew',
     'run',
     'train',
     'replay',

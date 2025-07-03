@@ -193,10 +193,10 @@ def run_crew(inputs: Dict[str, Any], verbose: bool = False):
     
     try:
         # Import here to avoid circular imports
-        from server_research_mcp.crew import ServerResearchMcp
+        from server_research_mcp.crew import ServerResearchMcpCrew
         
         # Initialize and run the crew - MCPAdapt handles its own context management
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         crew = crew_instance.crew()  # Get the crew object
         
         # Run with inputs
@@ -333,7 +333,7 @@ def main():
 def train():
     """Train the crew using CrewAI's native training functionality."""
     try:
-        from server_research_mcp.crew import ServerResearchMcp
+        from server_research_mcp.crew import ServerResearchMcpCrew
         
         # Default training parameters
         n_iterations = 2
@@ -343,7 +343,7 @@ def train():
         print(f"🎯 Starting training for {n_iterations} iterations...")
         
         # Initialize and train the crew
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         crew = crew_instance.crew()
         
         crew.train(
@@ -361,7 +361,7 @@ def train():
 def replay():
     """Replay the crew execution from a specific task using CrewAI's native replay functionality."""
     try:
-        from server_research_mcp.crew import ServerResearchMcp
+        from server_research_mcp.crew import ServerResearchMcpCrew
         import subprocess
         
         # Get task ID from command line args or use a default
@@ -382,7 +382,7 @@ def replay():
         inputs = {"paper_query": "machine learning transformers", "topic": "research", "current_year": datetime.now().year}
         
         # Initialize and replay the crew
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         crew = crew_instance.crew()
         
         crew.replay(task_id=task_id, inputs=inputs)
@@ -397,7 +397,7 @@ def replay():
 def test():
     """Test the crew using CrewAI's native testing functionality."""
     try:
-        from server_research_mcp.crew import ServerResearchMcp
+        from server_research_mcp.crew import ServerResearchMcpCrew
         import sys
         
         # Default test parameters
@@ -417,7 +417,7 @@ def test():
         print(f"🧪 Testing crew with {n_iterations} iterations using {model}...")
         
         # Initialize and test the crew
-        crew_instance = ServerResearchMcp()
+        crew_instance = ServerResearchMcpCrew()
         crew = crew_instance.crew()
         
         # Use CrewAI's built-in test method
