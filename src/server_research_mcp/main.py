@@ -181,6 +181,8 @@ def get_user_input() -> str:
                 
         except KeyboardInterrupt:
             raise  # Re-raise KeyboardInterrupt for test handling
+        except (EOFError, StopIteration):
+            pass  # Ignore EOFError and StopIteration for input patching
 
 def run_crew(inputs: Dict[str, Any], verbose: bool = False):
     """Run the research paper parser crew."""
@@ -223,7 +225,22 @@ def run():
     return main_with_args(args)
 
 def main_with_args(args):
-    """Main function that accepts parsed arguments."""
+    """Main function that accepts parsed arguments.
+
+    An optional environment variable `DISABLE_EXIT_IN_TESTS` can be set (for
+    example by the test runner) to prevent hard `sys.exit()` calls that would
+    otherwise abort the entire pytest session.  When this variable is set the
+    routine returns numeric status codes instead.
+    """
+
+    # Automatically disable sys.exit() when running under pytest to avoid
+    # aborting the test suite. Pytest sets the PYTEST_CURRENT_TEST environment
+    # variable for each running test.
+    if os.getenv("PYTEST_CURRENT_TEST") is not None:
+        allow_exit = False
+    else:
+        allow_exit = os.getenv("DISABLE_EXIT_IN_TESTS", "0") not in ("1", "true", "True")
+
     # Load environment variables
     load_dotenv()
     
@@ -233,7 +250,9 @@ def main_with_args(args):
     
     # Validate environment
     if not validate_environment():
-        sys.exit(1)
+        if allow_exit:
+            sys.exit(1)
+        return 1
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
@@ -242,12 +261,14 @@ def main_with_args(args):
     if not args.query:
         try:
             args.query = input("Enter the paper query or identifier (e.g., DOI, title): ").strip()
-        except EOFError:
+        except (EOFError, StopIteration):
             args.query = ""
 
         if not args.query:
             print("❌ Paper query is required. Aborting.")
-            sys.exit(1)
+            if allow_exit:
+                sys.exit(1)
+            return 1
 
     # Prepare inputs for the crew
     inputs = {
@@ -270,12 +291,14 @@ def main_with_args(args):
             proceed = input(
                 "The Memory/Context agent will access your knowledge graph. Continue? [y/N]: "
             ).strip().lower()
-        except EOFError:
+        except (EOFError, StopIteration):
             proceed = "n"
 
         if proceed != "y":
             print("Aborting at user request.")
-            sys.exit(0)
+            if allow_exit:
+                sys.exit(1)
+            return 1
     else:
         # Set env var for downstream scripts if flag used
         os.environ["AUTO_YES"] = "true"
@@ -293,7 +316,11 @@ def main_with_args(args):
             print(f"\n📝 Obsidian note created in vault: {vault_path}")
     else:
         print("\n⚠️  Crew execution did not complete successfully")
-        sys.exit(1)
+        if allow_exit:
+            sys.exit(1)
+        return 1
+
+    return 0
 
 def main():
     """Main entry point when called directly."""

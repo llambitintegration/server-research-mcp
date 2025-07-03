@@ -8,6 +8,24 @@ from crewai import LLM
 # Load environment variables
 load_dotenv()
 
+# Utility helpers -----------------------------------------------------------
+
+def _parse_int_env(value: str | None, var_name: str) -> int:
+    """Parse an integer environment variable allowing inline comments.
+
+    The value may be something like "120  # longer timeout". This helper will
+    strip off anything after a '#' or whitespace and convert the first token to
+    an int.
+    """
+    if value is None:
+        raise ValueError(f"{var_name} environment variable is required")
+    # Remove inline comment if present
+    cleaned = value.split('#', 1)[0].strip()
+    try:
+        return int(cleaned)
+    except ValueError as e:
+        raise ValueError(f"{var_name} must be an integer, got '{value}'") from e
+
 
 class LLMConfig:
     """Centralized LLM configuration management - entirely environment-driven."""
@@ -51,22 +69,20 @@ class LLMConfig:
         """Get configured LLM instance with all settings from environment."""
         # All timeout and retry settings must come from environment
         timeout = os.getenv('LLM_REQUEST_TIMEOUT')
-        if timeout is None:
-            raise ValueError("LLM_REQUEST_TIMEOUT environment variable is required")
-        
         max_retries = os.getenv('LLM_MAX_RETRIES')
-        if max_retries is None:
-            raise ValueError("LLM_MAX_RETRIES environment variable is required")
-        
-        streaming = os.getenv('LLM_STREAMING')
+        streaming = False
         if streaming is None:
             raise ValueError("LLM_STREAMING environment variable is required (set to 'true' or 'false')")
-        
+
+        # Sanitize numeric values to allow inline comments (e.g., "120  # note")
+        timeout_int = _parse_int_env(timeout, 'LLM_REQUEST_TIMEOUT')
+        max_retries_int = _parse_int_env(max_retries, 'LLM_MAX_RETRIES')
+
         return LLM(
             model=f"{self.provider}/{self.model}",
             api_key=self.api_key,
-            timeout=int(timeout),
-            max_retries=int(max_retries),
+            timeout=timeout_int,
+            max_retries=max_retries_int,
             streaming=streaming.lower() == 'true'
         )
     

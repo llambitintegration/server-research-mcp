@@ -441,7 +441,6 @@ class ServerResearchMcp():
         return Agent(
             config=self.agents_config['historian'],
             tools=tools,
-            verbose=True,
             llm=configured_llm,
             max_iter=1,  # Reduced to prevent iteration loops
             respect_context_window=True,
@@ -557,18 +556,12 @@ class ServerResearchMcp():
         os.makedirs('outputs', exist_ok=True)
         logger.info("📁 Output directory ready")
         
-        # Check if we should disable memory/planning for ChromaDB compatibility
-        disable_memory = os.getenv("DISABLE_CREW_MEMORY", "false").lower() == "true"
-        logger.info(f"🧠 Crew memory enabled: {not disable_memory}")
-        logger.info(f"🎯 Crew planning enabled: {not disable_memory}")
         
         crew = Crew(
             agents=self.agents,  # Automatically created by the @agent decorator
             tasks=self.tasks,    # Automatically created by the @task decorator
             process=Process.sequential,
-            verbose=True,
-            memory=not disable_memory,         # Enable memory for context persistence (unless disabled)
-            planning=not disable_memory        # Enable planning for better coordination (unless disabled)
+            verbose=True 
         )
         
         logger.info(f"✅ Crew created with {len(crew.agents)} agents and {len(crew.tasks)} tasks")

@@ -120,12 +120,14 @@ class TestLLMIntegrationWithCrew:
             
     def test_llm_error_handling(self):
         """Test LLM handles errors gracefully."""
-        # Create LLM with invalid config
+        # Create LLM with invalid config and try to use it
         with pytest.raises(Exception):
             llm = LLM(
                 model="invalid/model",
                 api_key=None
             )
+            # Actually call the LLM to trigger the error
+            llm.call("test message")
             
     def test_llm_timeout_handling(self, llm_config):
         """Test LLM timeout handling."""

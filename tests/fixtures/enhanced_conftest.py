@@ -13,7 +13,7 @@ import asyncio
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 # Import fixtures from dedicated fixture files
-from .fixtures.mcp_fixtures import *
+from .mcp_fixtures import *
 
 
 def enhanced_chromadb_config_patch():

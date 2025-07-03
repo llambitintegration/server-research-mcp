@@ -3,40 +3,6 @@ context_gathering_task:
     CRITICAL: Avoid hallucination. Only work with existing memory data or minimal factual input.
     
     Memory context gathering for: {paper_query}
-    
-    How to use historian tools:
-
-    create_entities
-    Create multiple new entities in the knowledge graph
-    Input: entities (array of objects)
-    Each object contains:
-    name (string): Entity identifier
-    entityType (string): Type classification
-    observations (string[]): Associated observations
-    Ignores entities with existing names
-
-    read_graph
-    Read the entire knowledge graph
-    No input required
-    Returns complete graph structure with all entities and relations
-    
-    search_nodes
-    Search for nodes based on query
-    Input: query (string)
-    Searches across:
-    Entity names
-    Entity types
-    Observation content
-    Returns matching entities and their relations
-    
-    open_nodes
-    Retrieve specific nodes by name
-    Input: names (string[])
-    Returns:
-    Requested entities
-    Relations between requested entities
-    Silently skips non-existent nodes
-
 
     STRICT workflow:
     1. Search memory for semantic matches to {paper_query}
@@ -86,35 +52,6 @@ paper_extraction_task:
     Original query: {paper_query}
     Enriched context: Use the previous task's output for search strategy and expanded terms
     Current year: {current_year}
-    
-    Search Tools
-    zotero_search_items: Search your library
-    zotero_advanced_search: Perform complex searches
-    zotero_get_collections: List collections
-    zotero_get_collection_items: Get items in a collection
-    zotero_get_tags: List all tags
-    zotero_get_recent: Get recently added items
-    zotero_search_by_tag: Search your library using custom tag filters
-    Content Tools
-    zotero_get_item_metadata: Get detailed metadata (supports BibTeX export via format="bibtex")
-    zotero_get_item_fulltext: Get full text content
-    zotero_get_item_children: Get attachments and notes
-    Annotation & Notes Tools
-    zotero_get_annotations: Get annotations (including direct PDF extraction)
-    zotero_get_notes: Retrieve notes from your Zotero library
-    zotero_search_notes: Search in notes and annotations (including PDF-extracted)
-    zotero_create_note: Create a new note for an item (beta feature)
-
-    Context Tools
-
-    resolve-library-id: Resolves a general library name into a Context7-compatible library ID.
-
-    libraryName (required): The name of the library to search for
-    get-library-docs: Fetches documentation for a library using a Context7-compatible library ID.
-
-    context7CompatibleLibraryID (required): Exact Context7-compatible library ID (e.g., /mongodb/docs, /vercel/next.js)
-    topic (optional): Focus the docs on a specific topic (e.g., "routing", "hooks")
-    tokens (optional, default 10000): Max number of tokens to return. Values less than the default value of 10000 are automatically increased to 10000.
 
     STRICT WORKFLOW:
     1. Parse the enriched context from the previous task (Historian)
@@ -132,7 +69,7 @@ paper_extraction_task:
     6. Extract highlights, annotations, and notes if available
     
     TOOL RESTRICTIONS: 
-    - Use ONLY Zotero and Context7 tools
+    - Use ONLY Zotero tools
     - DO NOT use memory tools (search_nodes, create_entities, etc.)
     - If you need historical context, refer to the Historian's output
     
