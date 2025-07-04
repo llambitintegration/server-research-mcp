@@ -129,18 +129,24 @@ def test_item_key_schema_validation_improvement():
 
 def test_legitimate_params_includes_item_key():
     """
-    Verify that item_key is included in the legitimate_params list to prevent
-    incorrect JSON parsing attempts.
+    Verify that item_key parameter handling is properly implemented.
+    
+    In the new simplified architecture, the item_key parameter handling is 
+    managed through ParameterHandlers.zotero_handler instead of a 
+    legitimate_params list.
     """
-    from src.server_research_mcp.tools.mcp_tools import MCPToolWrapper
+    from src.server_research_mcp.tools.mcp_tools import ParameterHandlers
     
-    # Check the actual source code for legitimate_params
-    import inspect
-    source_code = inspect.getsource(MCPToolWrapper._run)
+    # Test that the zotero_handler properly handles item_key parameters
+    test_params = {"item_key": "MU566VUM", "query": "test"}
+    processed_params = ParameterHandlers.zotero_handler(test_params)
     
-    # The legitimate_params list should include item_key
-    if 'item_key' not in source_code:
-        pytest.fail("item_key should be added to legitimate_params list in MCPToolWrapper._run")
+    # The handler should preserve item_key
+    assert "item_key" in processed_params
+    assert processed_params["item_key"] == "MU566VUM"
+    
+    # This replaces the old legitimate_params mechanism
+    print("✅ Parameter handling works correctly in new architecture")
 
 
 if __name__ == "__main__":

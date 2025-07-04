@@ -43,14 +43,85 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Environment
+# Environment and Secrets
 .env
 *.env
-example.env
+.env.*
+!.env.example
+!example.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+*.jks
+*.keystore
+*.truststore
+secrets/
+.secrets/
+credentials.json
+*.credentials
+auth.json
+*.auth
+.aws/
+.gcp/
+.azure/
+.dockercfg
+.docker/config.json
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+*.temp
+*~
+*.swp
+*.swo
+
+# IDE and Editor files
+.idea/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/.ropeproject
+*.sublime-project
+*.sublime-workspace
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Large files and media
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.aac
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.dmg
+*.iso
 
 # Misc
 out.out
 uv.lock
+.dum
+*.out
 
 # Test artifacts
 tests/__pycache__/
@@ -69,3 +140,8 @@ coverage.xml
 # Ignore temp
 *.tmp
 *.temp
+
+# Logs
+logs/
+*.log
+*.log.*

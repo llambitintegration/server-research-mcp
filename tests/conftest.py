@@ -177,6 +177,15 @@ def create_mock_mcp_tools():
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
     """Set up test environment with proper isolation and MCP mocking."""
+    # Only set up test environment if we're actually running tests
+    # Check if we're in a pytest context by looking for pytest-specific indicators
+    if not (os.environ.get('PYTEST_CURRENT_TEST') or 
+            'pytest' in sys.modules or
+            any('pytest' in arg for arg in sys.argv)):
+        # Not in a test context, skip setup
+        yield None
+        return
+    
     # Create a temporary directory for test data
     temp_dir = tempfile.mkdtemp(prefix="test_chromadb_")
     
@@ -186,6 +195,20 @@ def setup_test_environment():
     # Only disable memory if not already set (allow test-specific overrides)
     if "DISABLE_CREW_MEMORY" not in os.environ:
         os.environ["DISABLE_CREW_MEMORY"] = "true"
+    
+    # Set LLM environment variables required for testing
+    if "LLM_PROVIDER" not in os.environ:
+        os.environ["LLM_PROVIDER"] = "anthropic"
+    if "LLM_MODEL" not in os.environ:
+        os.environ["LLM_MODEL"] = "claude-sonnet-4-20250514"
+    if "ANTHROPIC_API_KEY" not in os.environ:
+        os.environ["ANTHROPIC_API_KEY"] = "test-key-for-validation"
+    if "LLM_REQUEST_TIMEOUT" not in os.environ:
+        os.environ["LLM_REQUEST_TIMEOUT"] = "30"
+    if "LLM_MAX_RETRIES" not in os.environ:
+        os.environ["LLM_MAX_RETRIES"] = "2"
+    if "LLM_STREAMING" not in os.environ:
+        os.environ["LLM_STREAMING"] = "false"  # Disable streaming for tests
     
     # Apply enhanced patches to prevent infrastructure issues
     enhanced_chromadb_config_patch()
@@ -892,8 +915,13 @@ def mock_mcp_manager():
     async def mock_async_call_tool(server, tool, arguments):
         return mock_call_tool(tool, **arguments)
     
+    async def mock_async_shutdown():
+        return True
+    
     mock_manager.initialize = mock_initialize
     mock_manager.async_call_tool = mock_async_call_tool
+    # Override the sync shutdown with async version for async tests
+    mock_manager.shutdown = mock_async_shutdown
     
     return mock_manager
 

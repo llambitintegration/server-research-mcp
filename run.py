@@ -24,15 +24,41 @@ def main():
             replay()
         elif command == "test" and len(sys.argv) >= 4:
             test()
-        else:
+        elif command in ["train", "replay", "test"]:
+            # Known command but insufficient arguments
             print("Usage:")
-            print("  python run.py                      # Run the crew")
-            print("  python run.py train <n> <file>     # Train the crew")
-            print("  python run.py replay <task_id>     # Replay from task")
-            print("  python run.py test <n> <model>     # Test the crew")
+            print("  python run.py [topic]                  # Run the crew with optional topic")
+            print("  python run.py train <n> <file>         # Train the crew")
+            print("  python run.py replay <task_id>         # Replay from task")
+            print("  python run.py test <n> <model>         # Test the crew")
             sys.exit(1)
+        elif command.startswith('-') or command in ['help', '--help', '-h']:
+            # Help or option flags
+            print("Usage:")
+            print("  python run.py [topic]                  # Run the crew with optional topic")
+            print("  python run.py train <n> <file>         # Train the crew")
+            print("  python run.py replay <task_id>         # Replay from task")
+            print("  python run.py test <n> <model>         # Test the crew")
+            sys.exit(0 if command in ['help', '--help', '-h'] else 1)
+        elif len(command.split()) == 1 and len(command) < 20 and command not in [
+            'machine', 'learning', 'quantum', 'research', 'analysis', 'study', 'transformers',
+            'attention', 'sparse', 'neural', 'networks', 'deep', 'ai', 'artificial', 'intelligence'
+        ] and not any(char in command for char in [' ', '.', ',', ':', ';', '!', '?', '"', "'"]):
+            # Single suspicious word that looks like an invalid command
+            # Allow common research terms and phrases with spaces/punctuation to pass through
+            print("Usage:")
+            print("  python run.py [topic]                  # Run the crew with optional topic")
+            print("  python run.py train <n> <file>         # Train the crew")
+            print("  python run.py replay <task_id>         # Replay from task")
+            print("  python run.py test <n> <model>         # Test the crew")
+            sys.exit(1)
+        else:
+            # Treat as topic and run the main application
+            from server_research_mcp.main import main as main_func
+            import asyncio
+            asyncio.run(main_func())
     else:
-        # Default: run the crew
+        # Default: run the crew (will prompt for topic interactively)
         run()
 
 

@@ -79,25 +79,61 @@ class LLMConfig:
         timeout = os.getenv('LLM_REQUEST_TIMEOUT')
         max_retries = os.getenv('LLM_MAX_RETRIES')
         streaming = os.getenv('LLM_STREAMING')
+        max_tokens = os.getenv('LLM_MAX_TOKENS', '8192')  # Default to 8192 for research papers
+        
         if streaming is None:
             raise ValueError("LLM_STREAMING environment variable is required (set to 'true' or 'false')")
 
         # Sanitize numeric values to allow inline comments (e.g., "120  # note")
         timeout_int = _parse_int_env(timeout, 'LLM_REQUEST_TIMEOUT')
         max_retries_int = _parse_int_env(max_retries, 'LLM_MAX_RETRIES')
+        max_tokens_int = _parse_int_env(max_tokens, 'LLM_MAX_TOKENS')
 
         # Disable streaming for Anthropic provider due to LiteLLM compatibility issues
         effective_streaming = streaming.lower() == 'true'
         if self.provider == 'anthropic' and effective_streaming:
             effective_streaming = False
 
-        return LLM(
-            model=f"{self.provider}/{self.model}",
-            api_key=self.api_key,
-            timeout=timeout_int,
-            max_retries=max_retries_int,
-            streaming=effective_streaming
-        )
+        # Log LLM configuration before creation
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        llm_config = {
+            "model": f"{self.provider}/{self.model}",
+            "timeout": timeout_int,
+            "max_retries": max_retries_int,
+            "max_tokens": max_tokens_int,
+            "stream": effective_streaming,
+            "provider": self.provider
+        }
+        
+        logger.info("Creating LLM instance", extra=llm_config)
+        
+        try:
+            llm_instance = LLM(
+                model=f"{self.provider}/{self.model}",
+                api_key=self.api_key,
+                timeout=timeout_int,
+                max_retries=max_retries_int,
+                max_tokens=max_tokens_int,
+                stream=effective_streaming
+            )
+            
+            logger.info("LLM instance created successfully", extra={
+                "model": f"{self.provider}/{self.model}",
+                "instance_type": type(llm_instance).__name__
+            })
+            
+            return llm_instance
+            
+        except Exception as e:
+            logger.error("Failed to create LLM instance", extra={
+                "model": f"{self.provider}/{self.model}",
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "config": llm_config
+            }, exc_info=True)
+            raise
     
     def check_configuration(self) -> tuple[bool, Optional[str]]:
         """Check if LLM is properly configured."""

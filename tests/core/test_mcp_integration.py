@@ -200,11 +200,15 @@ class TestMCPAgentIntegration:
             # Test task configuration for MCP compatibility
             for task in crew.tasks:
                 assert hasattr(task, 'description')
-                # Check for actual template variables used in tasks
-                assert ('{paper_query}' in task.description or 
-                       '{current_year}' in task.description or 
-                       '{raw_paper_data}' in task.description or
-                       '{topic}' in task.description)
+                # Check that task descriptions are properly formatted (no more raw templates)
+                # In the new decorator system, templates are formatted with default values
+                assert task.description is not None
+                assert len(task.description) > 0
+                # Should not contain raw template strings after formatting
+                assert '{paper_query}' not in task.description
+                assert '{current_year}' not in task.description
+                assert '{raw_paper_data}' not in task.description
+                assert '{topic}' not in task.description
 
     @pytest.mark.timeout(10)
     def test_lightweight_agent_execution(self, disable_crew_memory, mock_mcp_manager):

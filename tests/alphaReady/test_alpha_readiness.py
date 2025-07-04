@@ -196,13 +196,16 @@ Created note at: /vault/Papers/test-paper.md
 
     def test_critical_argument_parsing(self):
         """CRITICAL: Command line argument parsing must work."""
-        # Test basic argument parsing
-        test_args = ['--topic', 'test topic', '--year', '2024']
+        # Test basic argument parsing with correct format
+        test_args = ['test topic', '--output-dir', 'test_output', '--verbose']
         
         # Mock sys.argv for testing
         with patch('sys.argv', ['main.py'] + test_args):
             args = parse_arguments()
             assert hasattr(args, 'topic')
+            assert args.topic == 'test topic'
+            assert args.output_dir == 'test_output'
+            assert args.verbose == True
             
         print("✅ CRITICAL: Argument parsing passed")
     

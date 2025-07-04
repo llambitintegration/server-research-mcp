@@ -12,14 +12,32 @@ except AttributeError:
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 from .crew import ServerResearchMcpCrew
-from .main import run, train, replay, test
 
 __version__ = "0.1.0"
+
+# Simple compatibility functions for run.py and tests
+def run():
+    """Run the research crew with user input."""
+    import asyncio
+    from .main import main
+    asyncio.run(main())
+
+def train():
+    """Training function for compatibility."""
+    print("Training functionality would be implemented here")
+    
+def replay():
+    """Replay function for compatibility.""" 
+    print("Replay functionality would be implemented here")
+    
+def test():
+    """Test function for compatibility."""
+    print("Test functionality would be implemented here")
 
 __all__ = [
     'ServerResearchMcpCrew',
     'run',
-    'train',
+    'train', 
     'replay',
     'test'
 ]

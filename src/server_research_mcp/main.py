@@ -1,99 +1,78 @@
-#!/usr/bin/env python
-import sys
+#!/usr/bin/env python3
+"""Main entry point for the MCP Server Research application."""
+
 import os
-import warnings
-import tempfile
-from dotenv import load_dotenv
-from datetime import datetime
-from typing import Dict, Any
+import sys
 import argparse
-import json
-from unittest.mock import patch
+import asyncio
+from typing import Dict, Any, Optional
+from pathlib import Path
 
-# Load environment variables first
-load_dotenv()
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
+from server_research_mcp.crew import ServerResearchMcpCrew
+from server_research_mcp.config.llm_config import check_llm_config, get_llm_config
+from server_research_mcp.utils.logging_config import setup_logging, get_logger, crew_execution, get_symbol
+from server_research_mcp.utils.log_context import log_execution, log_context
 
-def setup_chromadb_environment():
-    """Set up ChromaDB environment to prevent _type KeyError."""
-    # Set ChromaDB configuration if not already set
-    if not os.getenv("CHROMADB_PATH"):
-        # Create a persistent ChromaDB directory for the application
-        chromadb_dir = os.path.join(os.getcwd(), "data", "chromadb")
-        os.makedirs(chromadb_dir, exist_ok=True)
-        os.environ["CHROMADB_PATH"] = chromadb_dir
+# Initialize logging
+setup_logging()
+logger = get_logger(__name__)
+
+@log_execution
+def validate_environment() -> bool:
+    """Validate that all required environment variables are set."""
+    logger.info("Starting environment validation")
     
-    # Allow ChromaDB to reset collections if needed
-    if not os.getenv("CHROMADB_ALLOW_RESET"):
-        os.environ["CHROMADB_ALLOW_RESET"] = "true"
+    with log_context(operation="check_llm_config"):
+        is_valid, error_msg = check_llm_config()
+        if not is_valid:
+            logger.error(f"LLM configuration validation failed: {error_msg}")
+            return False
+        
+        llm_config = get_llm_config()
+        logger.info(f"{get_symbol('success')} LLM configuration valid: provider={llm_config['provider']}, model={llm_config['model']}")
     
-    # Disable memory to avoid ChromaDB issues for now
-    if not os.getenv("DISABLE_CREW_MEMORY"):
-        os.environ["DISABLE_CREW_MEMORY"] = "true"
-        print("⚠️  CrewAI memory disabled to avoid ChromaDB compatibility issues")
+    # Check for required directories
+    required_dirs = ['outputs', 'knowledge', 'checkpoints']
+    for dir_name in required_dirs:
+        dir_path = Path(dir_name)
+        if not dir_path.exists():
+            logger.warning(f"Creating missing directory: {dir_path}")
+            dir_path.mkdir(parents=True, exist_ok=True)
+        else:
+            logger.debug(f"{get_symbol('success')} Directory exists: {dir_path}")
     
-    print(f"✅ ChromaDB configured: {os.environ['CHROMADB_PATH']}")
+    logger.info("Environment validation completed successfully")
+    return True
 
-def patch_chromadb_config():
-    """Patch ChromaDB configuration to prevent _type KeyError."""
-    try:
-        import chromadb
-        
-        # Set default configuration to prevent _type KeyError
-        original_settings = chromadb.config.Settings
-        
-        def patched_settings(*args, **kwargs):
-            # Add default _type if not present
-            if '_type' not in kwargs:
-                kwargs['_type'] = 'hnsw'
-            return original_settings(*args, **kwargs)
-        
-        chromadb.config.Settings = patched_settings
-        print("✅ ChromaDB configuration patched")
-        
-    except ImportError:
-        print("⚠️  ChromaDB not available for patching")
-    except Exception as e:
-        print(f"⚠️  ChromaDB patching failed: {e}")
 
-# This main file is intended to be a way for you to run your
-# crew locally, so refrain from adding unnecessary logic into this file.
-# Replace with inputs you want to test with, it will automatically
-# interpolate any tasks and agents information
-
-def parse_arguments():
+@log_execution
+def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
+    logger.info("Parsing command line arguments")
+    
     parser = argparse.ArgumentParser(
-        description="Research Paper Parser - Extract and format papers from Zotero to Obsidian"
+        description="MCP Server Research - AI-powered research crew with MCP tools",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python -m server_research_mcp.main "machine learning transformers"
+  python -m server_research_mcp.main "quantum computing applications" --output-dir ./research_outputs
+        """
     )
     
     parser.add_argument(
-        "query",
-        type=str,
-        nargs='?',  # Optional; will prompt if missing
-        help="Paper identifier (Zotero key, DOI, title, or search query)"
-    )
-    
-    parser.add_argument(
-        "--topic",
-        type=str,
-        default="research",
-        help="Research topic or area (default: research)"
-    )
-    
-    parser.add_argument(
-        "--year",
-        type=int,
-        default=datetime.now().year,
-        help=f"Current year for context (default: {datetime.now().year})"
+        "topic",
+        help="Research topic or query to investigate"
     )
     
     parser.add_argument(
         "--output-dir",
         type=str,
         default="outputs",
-        help="Output directory for results (default: outputs)"
+        help="Directory to store research outputs (default: outputs)"
     )
     
     parser.add_argument(
@@ -104,331 +83,266 @@ def parse_arguments():
     
     parser.add_argument(
         "--dry-run",
-        action="store_true",
-        help="Run without actually creating Obsidian notes"
+        action="store_true", 
+        help="Validate configuration without running research"
     )
     
-    # Automatically answer yes to prompts (for automation)
-    parser.add_argument(
-        "-y", "--yes",
-        action="store_true",
-        help="Automatically answer yes to confirmation prompts"
-    )
+    args = parser.parse_args()
     
-    return parser.parse_args()
+    logger.info(f"Parsed arguments: topic='{args.topic}', output_dir='{args.output_dir}', verbose={args.verbose}, dry_run={args.dry_run}")
+    
+    return args
 
-def validate_environment():
-    """Validate required environment variables."""
-    required_vars = [
-        "ANTHROPIC_API_KEY",  # or OPENAI_API_KEY
-        "OBSIDIAN_VAULT_PATH"
-    ]
-    
-    optional_vars = [
-        "ZOTERO_API_KEY",
-        "ZOTERO_LIBRARY_ID",
-        "LLM_PROVIDER",
-        "LLM_MODEL"
-    ]
-    
-    missing_required = []
-    
-    # Check for at least one LLM API key
-    if not (os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")):
-        missing_required.append("ANTHROPIC_API_KEY or OPENAI_API_KEY")
-    
-    # Check other required variables
-    if not os.getenv("OBSIDIAN_VAULT_PATH"):
-        missing_required.append("OBSIDIAN_VAULT_PATH")
-    
-    if missing_required:
-        print("❌ Missing required environment variables:")
-        for var in missing_required:
-            print(f"   - {var}")
-        print("\nPlease set these in your .env file or environment")
-        return False
-    
-    # Report optional variables
-    print("✅ Environment validation passed")
-    print("\nOptional variables (for full functionality):")
-    for var in optional_vars:
-        value = os.getenv(var)
-        if value:
-            print(f"   ✓ {var}: {'set' if var.endswith('KEY') else value}")
-        else:
-            print(f"   ✗ {var}: not set")
-    
-    return True
 
-def get_user_input() -> str:
-    """Get and validate user input for research topic."""
-    import sys
+@log_execution
+def setup_output_directory(output_dir: str) -> Path:
+    """Create and validate output directory."""
+    logger.info(f"Setting up output directory: {output_dir}")
     
-    while True:
-        try:
-            topic = input("🎯 Enter your research topic: ").strip()
-            if not topic:
-                continue  # Loop until valid input provided
-            
-            # Confirmation loop
-            while True:
-                confirm = input(f"📋 Research topic: '{topic}'\n   Continue? (y/n): ").strip().lower()
-                if confirm in ['y', 'yes']:
-                    return topic
-                elif confirm in ['n', 'no']:
-                    sys.exit(0)
-                # Invalid confirmation - loop again without message
-                
-        except KeyboardInterrupt:
-            raise  # Re-raise KeyboardInterrupt for test handling
-        except (EOFError, StopIteration):
-            pass  # Ignore EOFError and StopIteration for input patching
-
-def run_crew(inputs: Dict[str, Any], verbose: bool = False):
-    """Run the research paper parser crew."""
-    print("\n🚀 Starting Research Paper Parser Crew...")
-    print(f"   Query: {inputs['paper_query']}")
-    print(f"   Topic: {inputs['topic']}")
-    print(f"   Year: {inputs['current_year']}")
+    output_path = Path(output_dir)
     
     try:
-        # Import here to avoid circular imports
-        from server_research_mcp.crew import ServerResearchMcpCrew
+        output_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"{get_symbol('success')} Output directory ready: {output_path.absolute()}")
         
-        # Initialize and run the crew - MCPAdapt handles its own context management
-        crew_instance = ServerResearchMcpCrew()
-        crew = crew_instance.crew()  # Get the crew object
+        # Test write permissions
+        test_file = output_path / ".write_test"
+        test_file.write_text("test")
+        test_file.unlink()
+        logger.debug(f"{get_symbol('success')} Output directory is writable")
         
-        # Run with inputs
-        result = crew.kickoff(inputs=inputs)
+        return output_path
         
-        print("\n✅ Crew execution completed successfully!")
+    except Exception as e:
+        logger.error(f"Failed to setup output directory: {e}", exc_info=True)
+        raise
+
+
+@log_execution
+async def initialize_research_crew(inputs: Optional[Dict[str, Any]] = None) -> ServerResearchMcpCrew:
+    """Initialize the research crew with comprehensive logging."""
+    logger.info("Initializing research crew")
+    
+    try:
+        with log_context(operation="create_research_crew"):
+            crew = ServerResearchMcpCrew(inputs=inputs)  # Pass inputs during initialization
+            logger.info(f"{get_symbol('success')} Research crew instance created")
+        
+        with log_context(operation="load_crew_config"):
+            # This will trigger the crew initialization
+            crew_instance = crew.crew()
+            logger.info(f"{get_symbol('success')} Crew initialized with {len(crew_instance.agents)} agents")
+            
+            # Log agent details
+            for i, agent in enumerate(crew_instance.agents):
+                logger.info(f"  Agent {i+1}: {agent.role} with {len(agent.tools)} tools")
+        
+        return crew
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize research crew: {e}", exc_info=True)
+        raise
+
+
+@log_execution
+async def run_research(crew: ServerResearchMcpCrew, topic: str, output_dir: Path) -> Dict[str, Any]:
+    """Execute the research workflow."""
+    logger.info(f"Starting research workflow for topic: '{topic}'")
+    
+    try:
+        with log_context(operation="prepare_research_inputs"):
+            # Handle both string topics and Namespace objects
+            if hasattr(topic, 'topic'):
+                # It's a Namespace object from argparse
+                inputs = {
+                    'topic': topic.topic,
+                    'output_dir': str(output_dir),
+                    'research_depth': 'comprehensive'
+                }
+                # Add paper_query if available for backward compatibility
+                if hasattr(topic, 'query'):
+                    inputs['paper_query'] = topic.query
+            else:
+                # It's a string topic
+                inputs = {
+                    'topic': topic,
+                    'output_dir': str(output_dir),
+                    'research_depth': 'comprehensive'
+                }
+            logger.info(f"Research inputs prepared: {inputs}")
+        
+        with log_context(operation="execute_crew_kickoff"):
+            logger.info("Executing crew kickoff...")
+            with crew_execution():
+                result = crew.crew().kickoff(inputs=inputs)
+            logger.info(f"{get_symbol('success')} Crew execution completed successfully")
+        
+        # Process and log results
+        if hasattr(result, 'raw'):
+            logger.info(f"Research completed. Raw result length: {len(str(result.raw))} characters")
+        else:
+            logger.info(f"Research completed. Result type: {type(result)}")
+        
+        return {
+            'status': 'success',
+            'result': result,
+            'topic': topic,
+            'output_dir': str(output_dir)
+        }
+        
+    except Exception as e:
+        logger.error(f"Research workflow failed: {e}", exc_info=True)
+        return {
+            'status': 'error',
+            'error': str(e),
+            'topic': topic,
+            'output_dir': str(output_dir)
+        }
+
+
+def get_user_input() -> str:
+    """Get research topic from user input with validation."""
+    while True:
+        try:
+            topic = input("Enter your research topic: ").strip()
+            if not topic:
+                print("Please enter a valid research topic.")
+                continue
+                
+            while True:
+                confirmation = input(f"Research topic: '{topic}' - Continue? (y/n): ").strip().lower()
+                if confirmation in ['y', 'yes']:
+                    return topic
+                elif confirmation in ['n', 'no']:
+                    print("Research cancelled by user.")
+                    sys.exit(0)
+                else:
+                    print("Please enter 'y' for yes or 'n' for no.")
+                
+        except KeyboardInterrupt:
+            print("\nResearch cancelled by user.")
+            raise  # Re-raise KeyboardInterrupt for tests that expect it
+
+
+async def run_crew(topic: str, output_dir: str = "outputs") -> dict:
+    """Run the research crew with given topic."""
+    logger.info(f"Running crew for topic: {topic}")
+    
+    try:
+        # Setup output directory
+        output_path = setup_output_directory(output_dir)
+        
+        # Initialize and run crew with topic inputs
+        crew_inputs = {'topic': topic}
+        crew = await initialize_research_crew(inputs=crew_inputs)
+        result = await run_research(crew, topic, output_path)
+        
         return result
         
     except Exception as e:
-        print(f"\n❌ Error during crew execution: {e}")
-        if verbose:
-            import traceback
-            traceback.print_exc()
-        return None
+        logger.error(f"Crew execution failed: {e}", exc_info=True)
+        return {
+            'status': 'error',
+            'error': str(e)
+        }
+
+
+def main_with_args(args) -> Dict[str, Any]:
+    """Run main function with provided arguments instead of parsing from command line.
+    
+    This is useful for testing and programmatic usage.
+    Returns a dictionary with status and result information.
+    """
+    logger.info(f"{get_symbol('rocket')} Starting MCP Server Research application")
+    
+    try:
+        # Validate environment
+        if not validate_environment():
+            logger.error(f"{get_symbol('error')} Environment validation failed")
+            return {'status': 'error', 'error': 'Environment validation failed'}
+        
+        # Setup output directory
+        output_dir = setup_output_directory(args.output_dir)
+        
+        # Dry run check
+        if args.dry_run:
+            logger.info(f"{get_symbol('success')} Dry run completed - configuration is valid")
+            return {'status': 'success', 'message': 'Dry run completed successfully'}
+        
+        # Initialize crew with topic inputs
+        try:
+            crew_inputs = {'topic': args.topic}
+            crew = asyncio.run(initialize_research_crew(inputs=crew_inputs))
+        except Exception as e:
+            logger.error(f"Failed to initialize research crew: {e}")
+            return {'status': 'error', 'error': f'Failed to initialize research crew: {e}'}
+        
+        # Run research
+        result = asyncio.run(run_research(crew, args.topic, output_dir))
+        
+        if result['status'] == 'success':
+            logger.info(f"{get_symbol('party')} Research completed successfully!")
+            return {'status': 'success', 'result': result, 'output_dir': str(output_dir)}
+        else:
+            logger.error(f"{get_symbol('error')} Research failed: {result['error']}")
+            return {'status': 'error', 'error': result['error']}
+            
+    except KeyboardInterrupt:
+        logger.info(f"{get_symbol('wave')} Application interrupted by user")
+        return {'status': 'cancelled', 'message': 'Application interrupted by user'}
+    except Exception as e:
+        logger.error(f"{get_symbol('boom')} Unexpected error in main: {e}", exc_info=True)
+        return {'status': 'error', 'error': str(e)}
+
 
 def run():
-    """Entry point for run_crew script defined in pyproject.toml."""
-    # Set up ChromaDB environment before any other initialization
-    setup_chromadb_environment()
-    patch_chromadb_config()
+    """Legacy compatibility function - runs main with default arguments."""
+    import asyncio
+    asyncio.run(main())
+
+
+async def main():
+    """Main application entry point."""
+    logger.info(f"{get_symbol('rocket')} Starting MCP Server Research application")
     
-    # Parse command line arguments
-    args = parse_arguments()
-    
-    # Run with the parsed arguments
-    return main_with_args(args)
-
-def main_with_args(args):
-    """Main function that accepts parsed arguments.
-
-    An optional environment variable `DISABLE_EXIT_IN_TESTS` can be set (for
-    example by the test runner) to prevent hard `sys.exit()` calls that would
-    otherwise abort the entire pytest session.  When this variable is set the
-    routine returns numeric status codes instead.
-    """
-
-    # Automatically disable sys.exit() when running under pytest to avoid
-    # aborting the test suite. Pytest sets the PYTEST_CURRENT_TEST environment
-    # variable for each running test.
-    if os.getenv("PYTEST_CURRENT_TEST") is not None:
-        allow_exit = False
-    else:
-        allow_exit = os.getenv("DISABLE_EXIT_IN_TESTS", "0") not in ("1", "true", "True")
-
-    # Load environment variables
-    load_dotenv()
-    
-    # Set up ChromaDB environment before CrewAI initialization
-    setup_chromadb_environment()
-    patch_chromadb_config()
-    
-    # Validate environment
-    if not validate_environment():
-        if allow_exit:
-            sys.exit(1)
-        return 1
-    
-    # Create output directory
-    os.makedirs(args.output_dir, exist_ok=True)
-    
-    # Prompt for paper query if not provided via CLI
-    if not args.query:
-        try:
-            args.query = input("Enter the paper query or identifier (e.g., DOI, title): ").strip()
-        except (EOFError, StopIteration):
-            args.query = ""
-
-        if not args.query:
-            print("❌ Paper query is required. Aborting.")
-            if allow_exit:
-                sys.exit(1)
-            return 1
-
-    # Prepare inputs for the crew
-    inputs = {
-        "paper_query": args.query,
-        "topic": args.topic,
-        "current_year": args.year,
-        "enriched_query": "{}",  # Will be filled by Historian
-        "raw_paper_data": "{}",  # Will be filled by Researcher
-        "structured_json": "{}"  # Will be filled by Archivist
-    }
-    
-    # Set environment variable for dry run if specified
-    if args.dry_run:
-        os.environ["DRY_RUN"] = "true"
-        print("\n⚠️  Running in DRY RUN mode - no files will be created")
-    
-    # Confirm before accessing memory/context if not auto-confirmed
-    if not (args.yes or os.getenv("AUTO_YES")):
-        try:
-            proceed = input(
-                "The Memory/Context agent will access your knowledge graph. Continue? [y/N]: "
-            ).strip().lower()
-        except (EOFError, StopIteration):
-            proceed = "n"
-
-        if proceed != "y":
-            print("Aborting at user request.")
-            if allow_exit:
-                sys.exit(1)
-            return 1
-    else:
-        # Set env var for downstream scripts if flag used
-        os.environ["AUTO_YES"] = "true"
-
-    # Run the crew
-    result = run_crew(inputs, verbose=args.verbose)
-    
-    if result:
-        print("\n📊 Results Summary:")
-        print(f"   - Enriched Query: {args.output_dir}/enriched_query.json")
-        
-        # Check if Obsidian note was created
-        vault_path = os.getenv("OBSIDIAN_VAULT_PATH")
-        if vault_path and not args.dry_run:
-            print(f"\n📝 Obsidian note created in vault: {vault_path}")
-    else:
-        print("\n⚠️  Crew execution did not complete successfully")
-        if allow_exit:
-            sys.exit(1)
-        return 1
-
-    return 0
-
-def main():
-    """Main entry point when called directly."""
-    # Parse arguments
-    args = parse_arguments()
-    
-    # Run with the parsed arguments
-    return main_with_args(args)
-
-def train():
-    """Train the crew using CrewAI's native training functionality."""
     try:
-        from server_research_mcp.crew import ServerResearchMcpCrew
+        # Parse arguments
+        args = parse_arguments()
         
-        # Default training parameters
-        n_iterations = 2
-        inputs = {"paper_query": "machine learning transformers", "topic": "research", "current_year": datetime.now().year}
-        filename = "trained_model.pkl"
+        # Validate environment
+        if not validate_environment():
+            logger.error(f"{get_symbol('error')} Environment validation failed")
+            sys.exit(1)
         
-        print(f"🎯 Starting training for {n_iterations} iterations...")
+        # Setup output directory
+        output_dir = setup_output_directory(args.output_dir)
         
-        # Initialize and train the crew
-        crew_instance = ServerResearchMcpCrew()
-        crew = crew_instance.crew()
-        
-        crew.train(
-            n_iterations=n_iterations,
-            inputs=inputs,
-            filename=filename
-        )
-        
-        print(f"✅ Training completed! Model saved as {filename}")
-        
-    except Exception as e:
-        print(f"❌ Training failed: {e}")
-        raise Exception(f"An error occurred while training the crew: {e}")
-
-def replay():
-    """Replay the crew execution from a specific task using CrewAI's native replay functionality."""
-    try:
-        from server_research_mcp.crew import ServerResearchMcpCrew
-        import subprocess
-        
-        # Get task ID from command line args or use a default
-        import sys
-        if len(sys.argv) >= 3:
-            task_id = sys.argv[2]
-        else:
-            # If no task ID provided, show available tasks
-            print("📋 Retrieving latest task outputs...")
-            subprocess.run(["crewai", "log-tasks-outputs"], check=True)
-            print("\n❓ Please provide a task ID to replay:")
-            print("Usage: python -m server_research_mcp replay <task_id>")
+        # Dry run check
+        if args.dry_run:
+            logger.info(f"{get_symbol('success')} Dry run completed - configuration is valid")
             return
         
-        print(f"🔄 Replaying from task: {task_id}")
+        # Initialize crew with topic inputs
+        crew_inputs = {'topic': args.topic}
+        crew = await initialize_research_crew(inputs=crew_inputs)
         
-        # Optional inputs for replay
-        inputs = {"paper_query": "machine learning transformers", "topic": "research", "current_year": datetime.now().year}
+        # Run research
+        result = await run_research(crew, args.topic, output_dir)
         
-        # Initialize and replay the crew
-        crew_instance = ServerResearchMcpCrew()
-        crew = crew_instance.crew()
-        
-        crew.replay(task_id=task_id, inputs=inputs)
-        
-        print("✅ Replay completed!")
-        
-    except subprocess.CalledProcessError as e:
-        raise Exception(f"An error occurred while replaying the crew: {e}")
+        if result['status'] == 'success':
+            logger.info(f"{get_symbol('party')} Research completed successfully!")
+            print(f"Research results saved to: {output_dir}")
+        else:
+            logger.error(f"{get_symbol('error')} Research failed: {result['error']}")
+            sys.exit(1)
+            
+    except KeyboardInterrupt:
+        logger.info(f"{get_symbol('wave')} Application interrupted by user")
+        sys.exit(0)
     except Exception as e:
-        raise Exception(f"An unexpected error occurred: {e}")
+        logger.error(f"{get_symbol('boom')} Unexpected error in main: {e}", exc_info=True)
+        sys.exit(1)
 
-def test():
-    """Test the crew using CrewAI's native testing functionality."""
-    try:
-        from server_research_mcp.crew import ServerResearchMcpCrew
-        import sys
-        
-        # Default test parameters
-        n_iterations = 2
-        model = "gpt-4o-mini"
-        
-        # Parse command line arguments if provided
-        if len(sys.argv) >= 3:
-            try:
-                n_iterations = int(sys.argv[2])
-            except ValueError:
-                print("⚠️  Invalid number of iterations, using default: 2")
-                
-        if len(sys.argv) >= 4:
-            model = sys.argv[3]
-        
-        print(f"🧪 Testing crew with {n_iterations} iterations using {model}...")
-        
-        # Initialize and test the crew
-        crew_instance = ServerResearchMcpCrew()
-        crew = crew_instance.crew()
-        
-        # Use CrewAI's built-in test method
-        # Note: This might require the crew to have test configuration
-        crew.test(n_iterations=n_iterations, model=model)
-        
-        print("✅ Testing completed! Check output for performance metrics.")
-        
-    except Exception as e:
-        print(f"❌ Testing failed: {e}")
-        raise Exception(f"An error occurred while testing the crew: {e}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

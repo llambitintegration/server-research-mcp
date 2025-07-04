@@ -22,4 +22,5 @@ dependencies = [
     "psutil>=5.9.0",
     "zotero-mcp>=0.1.6",
     "pytest-cov>=6.2.1",
+    "python-json-logger>=3.3.0",
 ]
