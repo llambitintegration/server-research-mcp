@@ -19,8 +19,8 @@ class _BaseMem:
         return "stub-context"
 ShortTermMemory=_BaseMem
 LongTermMemory=_BaseMem
-memory.short_term=ShortTermMemory()
-memory.long_term=LongTermMemory()
+memory.short_term=ShortTermMemory()  # type: ignore[attr-defined]
+memory.long_term=LongTermMemory()  # type: ignore[attr-defined]
 
 storage=ModuleType("crewai.memory.storage")
 rag_storage=ModuleType("crewai.memory.storage.rag_storage")
@@ -76,10 +76,10 @@ class Crew:
 # Dummy decorators
 _identity=lambda f:f
 project=ModuleType("crewai.project")
-project.CrewBase=_identity  # type: ignore
-project.agent=_identity
-project.crew=_identity
-project.task=_identity
+setattr(project,"CrewBase",_identity)
+setattr(project,"agent",_identity)
+setattr(project,"crew",_identity)
+setattr(project,"task",_identity)
 sys.modules["crewai.project"]=project
 
 crew_mod=ModuleType("crewai.crew"); crew_mod.Crew=Crew  # type: ignore

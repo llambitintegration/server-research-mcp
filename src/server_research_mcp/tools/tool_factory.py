@@ -1,10 +1,19 @@
 """
 Factory and decorator for creating MCP tools with zero boilerplate.
 """
-from typing import Type, Optional, Dict, Any, List
+from typing import Type, Optional, Dict, Any, List, TYPE_CHECKING
 from pydantic import BaseModel, create_model
 from .mcp_base_tool import MCPBaseTool
 import json
+
+if TYPE_CHECKING:
+    from crewai.tools import BaseTool  # type: ignore
+else:
+    try:
+        from crewai.tools import BaseTool  # type: ignore
+    except ImportError:  # If stub not yet on path (e.g., during static analysis)
+        class BaseTool:  # type: ignore
+            def __init__(self,*a,**k): pass
 
 
 def mcp_tool(
