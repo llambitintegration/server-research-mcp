@@ -7,9 +7,14 @@ import tempfile
 import shutil
 from unittest.mock import patch, MagicMock
 from pathlib import Path
+import pathlib
 
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+stub_root=pathlib.Path(__file__).parent/"stubs"
+if str(stub_root) not in sys.path:
+    sys.path.insert(0,str(stub_root))
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():

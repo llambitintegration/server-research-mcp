@@ -60,7 +60,9 @@ def mcp_tool(
             # Set the name and description using proper Pydantic initialization
             kwargs.setdefault('name', tool_name)
             kwargs.setdefault('description', final_description)
-            super(tool_class, self).__init__(**kwargs)
+            # Initialize BaseTool directly to avoid super() issues
+            BaseTool.__init__(self, **kwargs)
+            return
         
         # Create the tool class attributes without overriding Pydantic fields
         attrs = {
