@@ -17,28 +17,29 @@ logger = logging.getLogger(__name__)
 class RateLimitedTool(BaseTool):
     """Wrapper that adds rate limiting to any CrewAI tool."""
     
+    # Declare fields that will be set in __init__
+    wrapped_tool: Optional[BaseTool] = None
+    rate_limiter: Optional[RateLimiter] = None
+    identifier: Optional[str] = None
+    
     def __init__(
         self,
         tool: BaseTool,
         rate_limiter: Optional[RateLimiter] = None,
-        identifier: Optional[str] = None
+        identifier: Optional[str] = None,
+        **kwargs
     ):
-        # Copy tool attributes
-        self.wrapped_tool = tool
-        self.name = f"rate_limited_{tool.name}"
-        self.description = tool.description
-        
         # Handle args_schema
         if hasattr(tool, 'args_schema') and tool.args_schema:
-            self.args_schema = tool.args_schema
+            args_schema = tool.args_schema
         else:
             # Create a simple schema if none exists
             class GenericArgs(BaseModel):
                 query: str = Field(default="", description="Input query")
-            self.args_schema = GenericArgs
+            args_schema = GenericArgs
         
         # Set up rate limiting
-        self.rate_limiter = rate_limiter or create_rate_limiter(
+        rate_limiter = rate_limiter or create_rate_limiter(
             f"tool_{tool.name}",
             RateLimitConfig(
                 max_requests_per_minute=20,
@@ -49,10 +50,18 @@ class RateLimitedTool(BaseTool):
                 backoff_factor=2.0
             )
         )
-        self.identifier = identifier or tool.name
+        identifier = identifier or tool.name
         
-        # Initialize parent
-        super().__init__()
+        # Initialize parent with required fields
+        super().__init__(
+            name=f"rate_limited_{tool.name}",
+            description=tool.description,
+            args_schema=args_schema,
+            wrapped_tool=tool,
+            rate_limiter=rate_limiter,
+            identifier=identifier,
+            **kwargs
+        )
     
     def _run(self, *args, **kwargs) -> Any:
         """Execute the wrapped tool with rate limiting."""

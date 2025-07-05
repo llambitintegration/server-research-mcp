@@ -395,12 +395,23 @@ class ServerResearchMcpCrew:
             
             # Create agent with detailed logging
             try:
+                # Get LLM instance and apply rate limiting
                 llm_instance = self.llm_config.get_llm()
-                logger.info("Creating agent with LLM", extra={
+                
+                # Apply LLM rate limiting
+                from .utils.llm_rate_limiter import get_rate_limited_llm
+                if not (hasattr(llm_instance, 'rate_limiter_applied') and llm_instance.rate_limiter_applied):
+                    llm_instance = get_rate_limited_llm(llm_instance)
+                    logger.info(f"{get_symbol('success')} Applied rate limiting to LLM for {definition.name}")
+                else:
+                    logger.info(f"{get_symbol('info')} LLM already rate limited for {definition.name}")
+                
+                logger.info("Creating agent with rate-limited LLM", extra={
                     "agent_name": definition.name,
-                    "llm_model": getattr(llm_instance, 'model', 'unknown'),
+                    "llm_model": getattr(llm_instance.wrapped_llm if hasattr(llm_instance, 'wrapped_llm') else llm_instance, 'model', 'unknown'),
                     "tools_available": len(tools),
-                    "schema": definition.schema.__name__
+                    "schema": definition.schema.__name__,
+                    "rate_limited": hasattr(llm_instance, 'rate_limiter_applied')
                 })
                 
                 # Format role with truncated topic to avoid very long role names
@@ -411,7 +422,7 @@ class ServerResearchMcpCrew:
                     "role_preview": formatted_role[:100] + "..." if len(formatted_role) > 100 else formatted_role
                 })
                 
-                # Prepare agent kwargs
+                # Prepare agent kwargs with enhanced retry and timeout settings
                 agent_kwargs = {
                     "role": formatted_role,
                     "goal": definition.goal,
@@ -420,8 +431,9 @@ class ServerResearchMcpCrew:
                     "llm": llm_instance,
                     "verbose": False,
                     "output_pydantic": definition.schema,
-                    "max_retry_limit": 3,  # Increase retry limit for better resilience
-                    "allow_delegation": False  # Disable delegation to prevent unexpected behavior
+                    "max_retry_limit": 5,  # Increased for rate limiting delays
+                    "allow_delegation": False,  # Disable delegation to prevent unexpected behavior
+                    "request_timeout": 120,  # Increased timeout for rate limiting
                 }
                 
                 # Add optional parameters if specified
@@ -429,8 +441,14 @@ class ServerResearchMcpCrew:
                     agent_kwargs["max_iter"] = definition.max_iter
                     logger.info(f"Setting max_iter={definition.max_iter} for agent {definition.name}")
                 if definition.max_execution_time is not None:
-                    agent_kwargs["max_execution_time"] = definition.max_execution_time
-                    logger.info(f"Setting max_execution_time={definition.max_execution_time} for agent {definition.name}")
+                    # Double the execution time to accommodate rate limiting delays
+                    doubled_time = definition.max_execution_time * 2
+                    agent_kwargs["max_execution_time"] = doubled_time
+                    logger.info(f"Setting max_execution_time={doubled_time} (doubled from {definition.max_execution_time}) for agent {definition.name}")
+                else:
+                    # Default execution time of 300s (5 minutes) for rate limiting accommodation
+                    agent_kwargs["max_execution_time"] = 300
+                    logger.info(f"Setting default max_execution_time=300 for agent {definition.name}")
                 
                 self._agents_cache[definition.name] = Agent(**agent_kwargs)
                 

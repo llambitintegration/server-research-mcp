@@ -11,6 +11,7 @@ from .tool_wrapper import (
     RateLimitedTool,
     wrap_tool_with_rate_limit,
     wrap_tools_with_rate_limit,
+    get_rate_limited_tools,
 )
 from .backoff_strategies import (
     ExponentialBackoff,
@@ -31,6 +32,7 @@ __all__ = [
     "RateLimitedTool",
     "wrap_tool_with_rate_limit",
     "wrap_tools_with_rate_limit",
+    "get_rate_limited_tools",
     
     # Backoff strategies
     "ExponentialBackoff",

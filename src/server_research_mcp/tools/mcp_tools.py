@@ -166,7 +166,7 @@ class MCPToolRegistry:
         return self._all_tools
     
     def get_agent_tools(self, agent_name: str, apply_rate_limiting: bool = True) -> List[BaseTool]:
-        """Get all tools for a specific agent with optional rate limiting."""
+        """Get all tools for a specific agent with comprehensive rate limiting."""
         # Find mapping for this agent
         mapping = next(
             (m for m in self.mappings if m.agent_name == agent_name), 
@@ -179,6 +179,7 @@ class MCPToolRegistry:
         
         # Get all available tools
         all_tools = self.get_all_tools()
+        logger.info(f"{get_symbol('docs')} Total available tools: {len(all_tools)}")
         
         # Filter tools by patterns
         matched_tools = []
@@ -188,27 +189,51 @@ class MCPToolRegistry:
                 if pattern_lower in tool.name.lower() and tool not in matched_tools:
                     matched_tools.append(tool)
         
+        logger.info(f"{get_symbol('success')} Matched {len(matched_tools)} tools for {agent_name}: {[t.name for t in matched_tools]}")
+        
         # Handle minimum count requirement
         if len(matched_tools) < mapping.required_count and mapping.fallback_enabled:
             fallback_count = mapping.required_count - len(matched_tools)
-            matched_tools.extend(self._create_fallback_tools(agent_name, fallback_count))
+            fallback_tools = self._create_fallback_tools(agent_name, fallback_count)
+            matched_tools.extend(fallback_tools)
+            logger.info(f"{get_symbol('warning')} Added {len(fallback_tools)} fallback tools for {agent_name}")
         
         # Apply rate limiting if enabled
         if apply_rate_limiting and matched_tools:
             # Determine tool type for appropriate rate limiting
-            tool_type = "default"
-            if agent_name == "researcher":
-                tool_type = "zotero"
-            elif agent_name == "historian":
-                tool_type = "memory"
-            elif agent_name == "publisher":
-                tool_type = "filesystem"
+            tool_type = self._get_tool_type_for_agent(agent_name)
             
-            matched_tools = get_rate_limited_tools(matched_tools, tool_type)
-            logger.info(f"{get_symbol('success')} Applied rate limiting to {agent_name} tools")
+            # Log before rate limiting
+            logger.info(f"{get_symbol('gear')} Applying {tool_type} rate limiting to {len(matched_tools)} tools for {agent_name}")
+            
+            # Apply rate limiting based on tool type
+            rate_limited_tools = get_rate_limited_tools(matched_tools, tool_type)
+            
+            # Verify rate limiting was applied
+            rate_limited_count = sum(1 for tool in rate_limited_tools if hasattr(tool, 'rate_limiter'))
+            logger.info(f"{get_symbol('success')} Rate limiting applied: {rate_limited_count}/{len(rate_limited_tools)} tools wrapped")
+            
+            # Log rate limit configurations
+            for tool in rate_limited_tools:
+                if hasattr(tool, 'rate_limiter'):
+                    config = tool.rate_limiter.config
+                    logger.debug(f"  {tool.name}: {config.max_requests_per_minute} req/min, "
+                               f"{config.max_requests_per_hour} req/hr, "
+                               f"{config.min_request_interval}s interval")
+            
+            return rate_limited_tools
         
-        logger.info(f"{get_symbol('debug')} {agent_name} agent: {len(matched_tools)} tools")
         return matched_tools
+    
+    def _get_tool_type_for_agent(self, agent_name: str) -> str:
+        """Determine the appropriate rate limiting type for an agent."""
+        agent_type_mapping = {
+            "researcher": "zotero",
+            "historian": "memory", 
+            "archivist": "sequential_thinking",
+            "publisher": "filesystem"
+        }
+        return agent_type_mapping.get(agent_name.lower(), "default")
     
     def _create_fallback_tools(self, agent_name: str, count: int) -> List[BaseTool]:
         """Create basic fallback tools."""
