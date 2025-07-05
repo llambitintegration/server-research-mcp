@@ -10,15 +10,21 @@ import sys
 from types import ModuleType
 from typing import Any, Callable, List, Optional
 from dataclasses import dataclass, field
+from server_research_mcp.rate_limiter import TokenBucketRateLimiter, rate_limited
 
 # ---------------------------------------------------------------------------
 # Core data classes mimicking CrewAI public API
 # ---------------------------------------------------------------------------
+
+# shared limiter for LLM calls (2 per second)
+_LLM_LIMITER = TokenBucketRateLimiter(rate=2, capacity=2)
+
 @dataclass
 class LLM:  # noqa: D101
     model: str
     api_key: Optional[str] = None
 
+    @rate_limited(_LLM_LIMITER)
     def invoke(self, _prompt: str, **_kwargs):  # noqa: D401
         # Deterministic mock response
         return "LLM-stub response"
@@ -151,3 +157,6 @@ memory_module.storage = storage_module  # type: ignore[attr-defined]
 sys.modules["crewai.memory"] = memory_module
 sys.modules["crewai.memory.storage"] = storage_module
 sys.modules["crewai.memory.storage.rag_storage"] = rag_storage_module
+
+# Expose memory submodule
+globals()["memory"] = memory_module

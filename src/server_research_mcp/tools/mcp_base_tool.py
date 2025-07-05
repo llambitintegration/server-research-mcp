@@ -7,8 +7,12 @@ from typing import Any, Dict, Type, Optional
 import asyncio
 import json
 import logging
+from ..rate_limiter import TokenBucketRateLimiter
 
 logger = logging.getLogger(__name__)
+
+# Global rate limiter: 5 MCP calls per second with burst 5
+MCP_RATE_LIMITER = TokenBucketRateLimiter(rate=5, capacity=5)
 
 # Module-level import for test patching
 def get_mcp_manager():
@@ -103,6 +107,7 @@ class MCPBaseTool(BaseTool):
         try:
             # Initialize the required server
             logger.info(f"🚀 Initializing MCP server: {self.server_name}")
+            await MCP_RATE_LIMITER.acquire()
             await manager.initialize([self.server_name])
             logger.info(f"✅ Server {self.server_name} initialized successfully")
             
@@ -120,6 +125,7 @@ class MCPBaseTool(BaseTool):
             
             # Call the MCP tool with provided arguments
             logger.info(f"📞 Calling MCP tool {self.server_name}.{self.mcp_tool_name}")
+            await MCP_RATE_LIMITER.acquire()
             result = await manager.call_tool(
                 server=self.server_name,
                 tool=self.mcp_tool_name,
