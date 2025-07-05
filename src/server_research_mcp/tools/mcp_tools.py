@@ -353,13 +353,18 @@ def get_archivist_tools() -> List[BaseTool]:
         SchemaValidationTool()
     ]
 
+def get_publisher_tools() -> List[BaseTool]:
+    """Return tools for the Publisher agent (none defined yet, kept for compatibility)."""
+    return []
+
 def get_all_mcp_tools() -> Dict[str, List[BaseTool]]:
     """Get all tools organized by category for easy access."""
     return {
         "historian": get_historian_tools(),
-        "context7": get_context7_tools(), 
+        "context7": get_context7_tools(),
         "researcher": get_researcher_tools(),
-        "archivist": get_archivist_tools()
+        "archivist": get_archivist_tools(),
+        "publisher": get_publisher_tools(),
     }
 
 # Backward compatibility
