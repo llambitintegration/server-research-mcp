@@ -1,7 +1,19 @@
 """
 Base class for MCP tools that eliminates boilerplate code.
 """
-from crewai.tools import BaseTool
+from typing import TYPE_CHECKING
+
+# Import BaseTool from crewai if available; fall back to a minimal stub during static analysis or when stubs are not yet on PYTHONPATH.
+if TYPE_CHECKING:
+    from crewai.tools import BaseTool  # type: ignore
+else:
+    try:
+        from crewai.tools import BaseTool  # type: ignore
+    except ImportError:
+        class BaseTool:  # type: ignore
+            def __init__(self, *args, **kwargs):
+                pass
+
 from pydantic import BaseModel
 from typing import Any, Dict, Type, Optional
 import asyncio
@@ -118,7 +130,8 @@ class MCPBaseTool(BaseTool):
                     schema_instance = self.args_schema(**kwargs)
                     if hasattr(schema_instance, 'to_mcp_format'):
                         original_kwargs = kwargs.copy()
-                        kwargs = schema_instance.to_mcp_format()
+                        # type: ignore[attr-defined] – runtime check guarantees presence
+                        kwargs = schema_instance.to_mcp_format()  # type: ignore[attr-defined]
                         logger.debug(f"🔄 Transformed arguments: {original_kwargs} -> {kwargs}")
                 except Exception as e:
                     logger.warning(f"⚠️ Failed to transform arguments using to_mcp_format: {e}")
