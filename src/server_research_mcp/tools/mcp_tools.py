@@ -2,7 +2,7 @@
 Unified MCP Tools System for Server Research MCP
 Provides extensible, plug-and-play tools for different agents and crews.
 """
-from typing import Type, Dict, Any, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Type, Dict, Any, List, Optional
 from pydantic import BaseModel, Field, field_validator
 import subprocess
 import json
@@ -19,6 +19,22 @@ from .tool_factory import mcp_tool
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# BaseTool import – fall back to a lightweight stub during static analysis or
+# when the real/stub crewai package hasn't been injected into PYTHONPATH.
+# ---------------------------------------------------------------------------
+if TYPE_CHECKING:
+    from crewai.tools import BaseTool  # type: ignore
+else:
+    try:
+        from crewai.tools import BaseTool  # type: ignore
+    except ImportError:
+        class BaseTool:  # type: ignore
+            name: str = "base_tool"
+            description: str = "stub"
+            def __init__(self, *args, **kwargs):
+                pass
 
 # =============================================================================
 # Input Schemas - Define the contracts for each tool
@@ -367,16 +383,4 @@ def get_all_mcp_tools() -> Dict[str, List[BaseTool]]:
     }
 
 # Backward compatibility
-historian_mcp_tools = get_historian_tools()
-
-# Ensure BaseTool symbol exists before use for static analysis
-if TYPE_CHECKING:
-    from crewai.tools import BaseTool  # type: ignore
-else:
-    try:
-        from crewai.tools import BaseTool  # type: ignore
-    except ImportError:
-        class BaseTool:  # type: ignore
-            name: str = "base_tool"
-            description: str = "stub"
-            def __init__(self,*a,**k): pass 
+historian_mcp_tools = get_historian_tools() 
